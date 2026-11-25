@@ -1,7 +1,12 @@
 import {
+  renderArchiveFileList,
+  renderArchiveResult,
+} from './components/archive-workspace.js';
+import {
   renderBatchQueue,
   renderBatchSummary,
 } from './components/batch-workspace.js';
+import { ARCHIVE_LIMITS, ARCHIVE_PRESETS } from './config/archive-presets.js';
 import { BATCH_LIMITS, QUEUE_STATUS } from './config/batch-limits.js';
 import {
   COMPRESSION_PRESETS,
@@ -11,6 +16,13 @@ import {
 import { IMAGE_LIMITS, IMAGE_PRESETS } from './config/image-presets.js';
 import { buildBatchZip } from './engines/archive-builder.js';
 import { runBatchQueue } from './engines/batch-compressor.js';
+import {
+  extractDroppedItems,
+  isFolderPickerSupported,
+  normalizeSelectedFiles,
+} from './engines/folder-compressor.js';
+import { compressFilesToZip } from './engines/general-compressor.js';
+import { compressFileToGzip } from './engines/gzip-compressor.js';
 import { compressImage } from './engines/image-compressor.js';
 import { renderImagePreview } from './engines/image-preview.js';
 import { compressPdf } from './engines/pdf-compressor.js';
@@ -56,6 +68,10 @@ const batchQueue = createProcessingQueue('Balanced');
 const itemAbortControllers = new Map();
 let lastZipInfo = null;
 let zipAbortController = null;
+
+let archiveMode = false;
+let archiveItems = [];
+let archiveResult = null;
 
 // ============================================================================
 // DOM Helpers
@@ -193,13 +209,15 @@ function setCompressionUiState(running) {
   cancelButton.hidden = !running;
 
   if (!running) {
-    startButton.firstElementChild.textContent = batchMode
-      ? 'Compress batch'
-      : selectedKind === 'image'
-        ? 'Compress image'
-        : selectedKind === 'pdf'
-          ? 'Compress PDF'
-          : 'Compress file';
+    startButton.firstElementChild.textContent = archiveMode
+      ? 'Create archive'
+      : batchMode
+        ? 'Compress batch'
+        : selectedKind === 'image'
+          ? 'Compress image'
+          : selectedKind === 'pdf'
+            ? 'Compress PDF'
+            : 'Compress file';
   }
 }
 
@@ -414,7 +432,11 @@ function enterBatchMode(files = []) {
     selectedFile = null;
     selectedFileBytes = null;
     selectedKind = 'batch';
+    archiveMode = false;
+    archiveItems = [];
+    archiveResult = null;
     batchMode = true;
+    syncArchiveUi();
     syncImageOptionsVisibility();
     updateWarnings();
   }
@@ -439,6 +461,99 @@ function enterBatchMode(files = []) {
 
   setCompressionUiState(false);
   syncBatchUi();
+}
+
+// ============================================================================
+// Archive & Folder Mode Integration
+// ============================================================================
+
+function syncArchiveUi() {
+  const section = getElement('archive-section');
+  section.hidden = !archiveMode;
+  getElement('archive-toggle').textContent = archiveMode
+    ? 'Exit archive mode'
+    : 'ZIP / GZ archive';
+
+  if (!archiveMode) {
+    return;
+  }
+
+  const totalBytes = archiveItems.reduce(
+    (sum, item) => sum + (item.file?.size || 0),
+    0
+  );
+  getElement('archive-count').textContent =
+    `${archiveItems.length} ${archiveItems.length === 1 ? 'FILE' : 'FILES'} • ${formatFileSize(totalBytes)}`;
+
+  const formatSelect = getElement('archive-format');
+  const gzipOption = formatSelect.querySelector('option[value="gzip"]');
+  const hasFolderPath = archiveItems.some((item) =>
+    (item.relativePath || '').includes('/')
+  );
+  const canUseGzip = archiveItems.length === 1 && !hasFolderPath;
+  gzipOption.disabled = !canUseGzip;
+  if (!canUseGzip && formatSelect.value === 'gzip') {
+    formatSelect.value = 'zip';
+  }
+
+  getElement('archive-name-row').hidden = formatSelect.value === 'gzip';
+  getElement('archive-pick-folder').hidden = !isFolderPickerSupported(
+    getElement('archive-folder-input')
+  );
+
+  renderArchiveFileList(
+    getElement('archive-list'),
+    archiveItems,
+    (removeIdx) => {
+      archiveItems.splice(removeIdx, 1);
+      archiveResult = null;
+      syncArchiveUi();
+    },
+    isCompressing
+  );
+}
+
+function enterArchiveMode(initialEntries = []) {
+  if (!archiveMode) {
+    cancelActiveOperation();
+    resetPressState();
+    clearImagePreview();
+    selectedFile = null;
+    selectedFileBytes = null;
+    selectedKind = 'archive';
+    batchMode = false;
+    batchQueue.clear();
+    archiveMode = true;
+    syncBatchUi();
+    syncImageOptionsVisibility();
+    updateWarnings();
+  }
+
+  if (initialEntries.length > 0) {
+    archiveItems = [...archiveItems, ...initialEntries];
+    archiveResult = null;
+    if (archiveItems.length > ARCHIVE_LIMITS.maxFiles) {
+      showError(
+        `Archive supports up to ${ARCHIVE_LIMITS.maxFiles} files (${archiveItems.length} selected).`
+      );
+      archiveItems = archiveItems.slice(0, ARCHIVE_LIMITS.maxFiles);
+    } else {
+      showError('');
+    }
+    const firstRoot = (
+      archiveItems[0]?.relativePath ||
+      archiveItems[0]?.file?.name ||
+      ''
+    ).split('/')[0];
+    getElement('filename').textContent =
+      archiveItems.length === 1
+        ? archiveItems[0].file.name
+        : `${firstRoot || 'Archive'} (${archiveItems.length} files)`;
+    getElement('paperhead').textContent = 'ARCHIVE / 001';
+  }
+
+  setCompressionUiState(false);
+  syncArchiveUi();
 }
 
 // ============================================================================
@@ -703,6 +818,10 @@ function resetWorkspace() {
   batchQueue.clear();
   lastZipInfo = null;
 
+  archiveMode = false;
+  archiveItems = [];
+  archiveResult = null;
+
   getElement('file').value = '';
   getElement('filelabel').textContent = 'Drop your PDF, image, or batch here';
   getElement('filesub').textContent =
@@ -716,6 +835,7 @@ function resetWorkspace() {
   updateWarnings();
   setCompressionUiState(false);
   syncBatchUi();
+  syncArchiveUi();
   showError('');
 }
 
@@ -848,8 +968,105 @@ async function startBatchCompression() {
   }
 }
 
+async function startArchiveCompression() {
+  if (archiveItems.length === 0) {
+    showError('Select files or a folder to archive first.');
+    return;
+  }
+
+  cancelActiveOperation();
+  const operationId = activeOperationId;
+  activeAbortController = new AbortController();
+  const { signal } = activeAbortController;
+
+  resetPressState();
+  showError('');
+  archiveResult = null;
+  setCompressionUiState(true);
+  getElement('start').firstElementChild.textContent = 'Archiving…';
+  syncArchiveUi();
+
+  const format = getElement('archive-format').value;
+  const presetId = getElement('archive-preset').value;
+  const archiveName =
+    getElement('archive-filename').value.trim() ||
+    ARCHIVE_LIMITS.defaultZipName;
+  const prefersReducedMotion = matchMedia(
+    '(prefers-reduced-motion: reduce)'
+  ).matches;
+
+  try {
+    const onProgress = ({ progress, label, indeterminate }) => {
+      if (operationId !== activeOperationId) {
+        return;
+      }
+      getElement('status').textContent = label;
+      updateProgress(Math.min(95, progress), indeterminate);
+      setPressPosition(Math.min(0.92, progress / 100));
+    };
+
+    const result =
+      format === 'gzip'
+        ? await compressFileToGzip(archiveItems[0].file, {
+            presetId,
+            signal,
+            onProgress,
+          })
+        : await compressFilesToZip(archiveItems, {
+            presetId,
+            archiveName,
+            signal,
+            onProgress,
+          });
+
+    if (operationId !== activeOperationId) {
+      return;
+    }
+
+    setPressPosition(1);
+    updateProgress(100, false);
+
+    if (!prefersReducedMotion) {
+      await waitForSettling(Math.max(0, 350 - result.durationMs), signal).catch(
+        () => {}
+      );
+    }
+
+    if (operationId !== activeOperationId) {
+      return;
+    }
+
+    archiveResult = result;
+    getElement('status').textContent = 'ARCHIVE COMPLETE';
+    renderArchiveResult(result, {
+      metricsElement: getElement('metrics'),
+      titleElement: getElement('result-title'),
+      summaryElement: getElement('result-summary'),
+      downloadButton: getElement('download'),
+    });
+    clearCompressedPreview();
+    getElement('result').hidden = false;
+    setCompressionUiState(false);
+    syncArchiveUi();
+  } catch (error) {
+    if (error?.name === 'AbortError' || operationId !== activeOperationId) {
+      resetPressState();
+      syncArchiveUi();
+      return;
+    }
+    resetPressState();
+    syncArchiveUi();
+    showError(error?.message || 'Archive compression failed.');
+  }
+}
+
 async function startCompression() {
   if (isCompressing) {
+    return;
+  }
+
+  if (archiveMode) {
+    await startArchiveCompression();
     return;
   }
 
@@ -955,7 +1172,16 @@ async function startCompression() {
 }
 
 function handleDownload() {
-  if (isCompressing || !compressionResult || !selectedFile) {
+  if (isCompressing) {
+    return;
+  }
+
+  if (archiveMode && archiveResult?.blob) {
+    triggerFileDownload(archiveResult.blob, archiveResult.outputFilename);
+    return;
+  }
+
+  if (!compressionResult || !selectedFile) {
     return;
   }
 
@@ -1050,12 +1276,28 @@ dropZone.ondragleave = () => {
   dropZone.classList.remove('drag');
 };
 
-dropZone.ondrop = (event) => {
+dropZone.ondrop = async (event) => {
   event.preventDefault();
   dropZone.classList.remove('drag');
-  if (!isCompressing) {
-    selectBrowserFiles(event.dataTransfer.files);
+  if (isCompressing) {
+    return;
   }
+
+  const droppedEntries = await extractDroppedItems(event.dataTransfer).catch(
+    () => null
+  );
+  if (
+    archiveMode ||
+    (droppedEntries &&
+      droppedEntries.some((entry) => (entry.relativePath || '').includes('/')))
+  ) {
+    enterArchiveMode(
+      droppedEntries || normalizeSelectedFiles(event.dataTransfer.files)
+    );
+    return;
+  }
+
+  selectBrowserFiles(event.dataTransfer.files);
 };
 
 getElement('sample').onclick = () => {
@@ -1076,8 +1318,63 @@ getElement('batch-toggle').onclick = () => {
   }
 };
 
+getElement('archive-toggle').onclick = () => {
+  if (isCompressing) {
+    return;
+  }
+  if (archiveMode) {
+    resetWorkspace();
+  } else {
+    enterArchiveMode([]);
+  }
+};
+
+getElement('archive-pick-files').onclick = () => {
+  if (!isCompressing) {
+    getElement('archive-files-input').click();
+  }
+};
+
+getElement('archive-pick-folder').onclick = () => {
+  if (!isCompressing) {
+    getElement('archive-folder-input').click();
+  }
+};
+
+getElement('archive-files-input').onchange = (event) => {
+  const entries = normalizeSelectedFiles(event.target.files);
+  event.target.value = '';
+  enterArchiveMode(entries);
+};
+
+getElement('archive-folder-input').onchange = (event) => {
+  const entries = normalizeSelectedFiles(event.target.files);
+  event.target.value = '';
+  enterArchiveMode(entries);
+};
+
+getElement('archive-clear').onclick = () => {
+  if (!isCompressing) {
+    archiveItems = [];
+    archiveResult = null;
+    resetPressState();
+    syncArchiveUi();
+  }
+};
+
+getElement('archive-format').onchange = () => {
+  syncArchiveUi();
+};
+
 getElement('cancel').onclick = () => {
   cancelActiveOperation();
+  if (archiveMode) {
+    setPressPosition(0);
+    setCompressionUiState(false);
+    getElement('status').textContent = 'ARCHIVE CANCELLED';
+    syncArchiveUi();
+    return;
+  }
   if (batchMode) {
     setPressPosition(0);
     setCompressionUiState(false);

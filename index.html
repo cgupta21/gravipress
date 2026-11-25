@@ -46,7 +46,7 @@
       </a>
       <div class="nav-right">
         <button class="link" id="about">About</button>
-        <span class="version">V.04</span>
+        <span class="version">V.05</span>
       </div>
     </header>
 
@@ -101,14 +101,12 @@
             <span class="supported">PNG</span>
             <span class="supported">WEBP</span>
             <span class="supported">AVIF</span>
+            <span class="supported">ZIP / GZ</span>
             <span class="soon" title="Video compression is not yet supported"
               >MP4</span
             >
             <span class="soon" title="Audio compression is not yet supported"
               >MP3</span
-            >
-            <span class="soon" title="Archive compression is not yet supported"
-              >ZIP</span
             >
           </div>
 
@@ -216,6 +214,9 @@
             <button class="link" id="batch-toggle" type="button">
               Batch mode
             </button>
+            <button class="link" id="archive-toggle" type="button">
+              ZIP / GZ archive
+            </button>
             <button class="link" id="cancel" type="button" hidden>
               Cancel compression
             </button>
@@ -225,6 +226,70 @@
           </div>
 
           <p id="error" role="alert" hidden></p>
+
+          <section class="archive-section" id="archive-section" hidden>
+            <div class="micro">
+              <span>ARCHIVE / FOLDER MODE</span>
+              <span id="archive-count">0 FILES</span>
+            </div>
+
+            <input type="file" id="archive-files-input" hidden multiple />
+            <input
+              type="file"
+              id="archive-folder-input"
+              hidden
+              webkitdirectory
+              directory
+              multiple
+            />
+
+            <div class="minor">
+              <button class="link" id="archive-pick-files" type="button">
+                Select files
+              </button>
+              <button class="link" id="archive-pick-folder" type="button">
+                Select folder
+              </button>
+              <button class="link" id="archive-clear" type="button">
+                Clear selection
+              </button>
+            </div>
+
+            <div class="option-row">
+              <label for="archive-format">Output format</label>
+              <select id="archive-format">
+                <option value="zip">ZIP (.zip)</option>
+                <option value="gzip">GZIP (.gz — single file)</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <label for="archive-preset">Compression level</label>
+              <select id="archive-preset">
+                <option value="Fast">Fast (DEFLATE 1)</option>
+                <option value="Balanced" selected>Balanced (DEFLATE 6)</option>
+                <option value="Maximum">Maximum (DEFLATE 9)</option>
+                <option value="Store">Store only (Level 0)</option>
+              </select>
+            </div>
+
+            <div class="option-row" id="archive-name-row">
+              <label for="archive-filename">Archive name</label>
+              <input
+                type="text"
+                id="archive-filename"
+                value="gravipress-archive.zip"
+                maxlength="120"
+              />
+            </div>
+
+            <p class="small option-note" id="archive-folder-note">
+              Preserves nested folder structure. Empty directories are not
+              included by browser folder pickers.
+            </p>
+
+            <ul class="batch-list" id="archive-list"></ul>
+          </section>
 
           <section class="batch-section" id="batch-section" hidden>
             <div class="micro">

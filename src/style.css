@@ -515,6 +515,23 @@ legend {
   gap: 8px;
 }
 
+.archive-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #2b2d2140;
+}
+
+.archive-section input[type='text'] {
+  border: 1px solid var(--olive);
+  background: var(--white);
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--olive);
+  max-width: 170px;
+}
+
 /* ==========================================================================
    Hydraulic Press Machine & Synchronized Animation
    ========================================================================== */

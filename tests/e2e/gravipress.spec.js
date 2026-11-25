@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { unzipSync } from 'fflate';
+import { gunzipSync, unzipSync } from 'fflate';
 import { PDFDocument } from 'pdf-lib';
 import { ensureTestFixtures } from './fixtures.js';
 
@@ -798,6 +798,249 @@ test('Phase 4 batch compression, mixed formats, error isolation, ZIP extraction,
       })
   );
 
+  expect(externalRequests).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('Phase 5 general file, nested folder, GZIP, and 1MB/5MB/10MB archive benchmarks', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const consoleErrors = [];
+  const externalRequests = [];
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
+  page.on('request', (req) => {
+    const url = req.url();
+    if (
+      !url.startsWith('http://127.0.0.1:4173') &&
+      !url.startsWith('http://localhost:4173') &&
+      !url.startsWith('blob:') &&
+      !url.startsWith('data:')
+    ) {
+      externalRequests.push(url);
+    }
+  });
+
+  // Create realistic 1 MB text, 5 MB CSV, 10 MB JSON, and 256 KB binary fixtures
+  const text1MbPath = path.join(FIXTURES_DIR, 'sample-1mb.txt');
+  const csv5MbPath = path.join(FIXTURES_DIR, 'dataset-5mb.csv');
+  const json10MbPath = path.join(FIXTURES_DIR, 'records-10mb.json');
+  const randomBinPath = path.join(FIXTURES_DIR, 'random-256kb.bin');
+
+  // Realistic natural text: diverse sentences with varied vocabulary & punctuation
+  const words = [
+    'Gravipress',
+    'industrial',
+    'hydraulic',
+    'press',
+    'mechanical',
+    'piston',
+    'chassis',
+    'steel',
+    'pressure',
+    'gauge',
+    'cylinder',
+    'valve',
+    'compression',
+    'lossless',
+    'deflate',
+    'stream',
+    'buffer',
+    'browser',
+    'performance',
+    'client',
+    'throughput',
+    'pipeline',
+    'optimization',
+    'integrity',
+    'payload',
+    'metric',
+  ];
+  const textChunks = [];
+  let currentBytes = 0;
+  let seed = 42;
+  while (currentBytes < 1024 * 1024) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const sentenceLen = 8 + (seed % 12);
+    const sentenceWords = [];
+    for (let w = 0; w < sentenceLen; w += 1) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      sentenceWords.push(words[seed % words.length]);
+    }
+    const line = sentenceWords.join(' ') + ` [epoch=${seed % 100000}].\n`;
+    textChunks.push(line);
+    currentBytes += Buffer.byteLength(line);
+  }
+  const text1Mb = Buffer.from(textChunks.join(''));
+
+  // Realistic CSV: varied customer/telemetry records with diverse fields
+  const statuses = ['PENDING', 'ACTIVE', 'PAUSED', 'FAILED', 'VERIFIED'];
+  const regions = ['us-east', 'us-west', 'eu-central', 'ap-south', 'ap-east'];
+  const csvLines = [
+    'id,timestamp,region,metric_kpa,temperature_c,status,notes\n',
+  ];
+  let csvBytes = Buffer.byteLength(csvLines[0]);
+  let rowId = 1000;
+  while (csvBytes < 5 * 1024 * 1024) {
+    rowId += 1;
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const reg = regions[seed % regions.length];
+    const stat = statuses[(seed >>> 4) % statuses.length];
+    const kpa = (100 + (seed % 900) * 0.75).toFixed(2);
+    const temp = (20 + (seed % 65) * 0.5).toFixed(1);
+    const line = `${rowId},2026-11-25T14:${(rowId % 60).toString().padStart(2, '0')}:00Z,${reg},${kpa},${temp},${stat},Press cycle telemetry ${rowId % 500}\n`;
+    csvLines.push(line);
+    csvBytes += Buffer.byteLength(line);
+  }
+  const csv5Mb = Buffer.from(csvLines.join(''));
+
+  // Realistic JSON: nested objects with varied telemetry and configuration payloads
+  const jsonRecords = [];
+  let jsonBytes = 2; // for []
+  let recordId = 1;
+  while (jsonBytes < 10 * 1024 * 1024) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const rec = {
+      recordId,
+      station: `HYDRAULIC-UNIT-${(recordId % 24) + 1}`,
+      timestamp: `2026-11-25T14:${(recordId % 60).toString().padStart(2, '0')}:${((recordId * 7) % 60).toString().padStart(2, '0')}Z`,
+      measurements: {
+        hydraulicPressureBar: 180 + (seed % 70),
+        ramDisplacementMm: (seed % 1500) / 10,
+        flowRateLpm: 45.2 + (seed % 15),
+      },
+      tags: ['gravipress', 'lossless', regions[seed % regions.length]],
+      operational: seed % 10 !== 0,
+    };
+    const str = JSON.stringify(rec);
+    jsonRecords.push(str);
+    jsonBytes += Buffer.byteLength(str) + 1; // comma
+    recordId += 1;
+  }
+  const json10Mb = Buffer.from(`[${jsonRecords.join(',')}]`);
+
+  const randomBin = Buffer.alloc(256 * 1024);
+  for (let i = 0; i < randomBin.length; i += 1) {
+    randomBin[i] = (i * 167 + ((i >> 3) ^ (i * 29))) & 0xff;
+  }
+
+  fs.writeFileSync(text1MbPath, text1Mb);
+  fs.writeFileSync(csv5MbPath, csv5Mb);
+  fs.writeFileSync(json10MbPath, json10Mb);
+  fs.writeFileSync(randomBinPath, randomBin);
+
+  await page.goto('/');
+  await page.locator('#archive-toggle').click();
+  await expect(page.locator('#archive-section')).toBeVisible();
+
+  // 1. Nested folder hierarchy via drop / webkitRelativePath simulation
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    const f1 = new File(['console.log("gravipress");'], 'app.js', {
+      type: 'text/javascript',
+    });
+    Object.defineProperty(f1, 'webkitRelativePath', {
+      value: 'my-app/src/app.js',
+    });
+    const f2 = new File(['# Heading\nBody text'], 'README.md', {
+      type: 'text/markdown',
+    });
+    Object.defineProperty(f2, 'webkitRelativePath', {
+      value: 'my-app/README.md',
+    });
+    dt.items.add(f1);
+    dt.items.add(f2);
+    document
+      .getElementById('archive-files-input')
+      .dispatchEvent(new Event('change'));
+    window.__testFolderFiles = dt.files;
+  });
+
+  // Upload multiple files in archive mode & verify GZIP option is disabled
+  await page
+    .locator('#archive-files-input')
+    .setInputFiles([text1MbPath, randomBinPath]);
+  await expect(page.locator('#archive-count')).toContainText('2 FILES');
+  await expect(
+    page.locator('#archive-format option[value="gzip"]')
+  ).toBeDisabled();
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, '11-archive-mode.png'),
+    fullPage: true,
+  });
+
+  // Compress mixed ZIP & verify extracted bytes
+  await page.locator('#start').click();
+  await expect(page.locator('#result')).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, '12-archive-completed.png'),
+    fullPage: true,
+  });
+
+  const zipDlPromise = page.waitForEvent('download');
+  await page.locator('#download').click();
+  const zipDl = await zipDlPromise;
+  const zipPath = path.join(FIXTURES_DIR, 'phase5-mixed.zip');
+  await zipDl.saveAs(zipPath);
+  const extractedZip = unzipSync(new Uint8Array(fs.readFileSync(zipPath)));
+  expect(Buffer.from(extractedZip['sample-1mb.txt']).equals(text1Mb)).toBe(
+    true
+  );
+  expect(Buffer.from(extractedZip['random-256kb.bin']).equals(randomBin)).toBe(
+    true
+  );
+
+  // 2. Single-file GZIP on 1 MB text & verify gunzip byte-for-byte
+  await page.locator('#archive-clear').click();
+  await page.locator('#archive-files-input').setInputFiles(text1MbPath);
+  await page.locator('#archive-format').selectOption('gzip');
+  await page.locator('#archive-preset').selectOption('Maximum');
+  await page.locator('#start').click();
+  await expect(page.locator('#result')).toBeVisible({ timeout: 30_000 });
+
+  const gzDlPromise = page.waitForEvent('download');
+  await page.locator('#download').click();
+  const gzDl = await gzDlPromise;
+  expect(gzDl.suggestedFilename()).toBe('sample-1mb.txt.gz');
+  const gzPath = path.join(FIXTURES_DIR, 'sample-1mb.txt.gz');
+  await gzDl.saveAs(gzPath);
+  const gzBytes = new Uint8Array(fs.readFileSync(gzPath));
+  expect(Buffer.from(gunzipSync(gzBytes)).equals(text1Mb)).toBe(true);
+
+  // 3. Benchmarks: 1 MB text (Fast/Balanced/Max), 5 MB CSV, 10 MB JSON
+  const benchmarks = [];
+  for (const [label, filePath, presets] of [
+    ['1MB-text', text1MbPath, ['Fast', 'Balanced', 'Maximum']],
+    ['5MB-csv', csv5MbPath, ['Fast', 'Balanced', 'Maximum']],
+    ['10MB-json', json10MbPath, ['Balanced', 'Maximum']],
+  ]) {
+    const origBytes = fs.readFileSync(filePath).byteLength;
+    for (const preset of presets) {
+      await page.locator('#archive-clear').click();
+      await page.locator('#archive-files-input').setInputFiles(filePath);
+      await page.locator('#archive-format').selectOption('zip');
+      await page.locator('#archive-preset').selectOption(preset);
+      await page.locator('#start').click();
+      await expect(page.locator('#result')).toBeVisible({ timeout: 60_000 });
+
+      const metrics = await page.locator('#metrics dd').allTextContents();
+      benchmarks.push({
+        fixture: label,
+        preset,
+        originalBytes: origBytes,
+        archiveText: metrics[1],
+        savedText: metrics[2],
+        duration: metrics[4],
+      });
+    }
+  }
+
+  console.log('\nARCHIVE_BENCHMARK_JSON=' + JSON.stringify(benchmarks));
   expect(externalRequests).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

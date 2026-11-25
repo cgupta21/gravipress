@@ -36,7 +36,10 @@ If no smaller valid output can be produced, Gravipress retains the original PDF,
 
 - **Supported PDF**: `.pdf` (validated by `%PDF-` header).
 - **Supported Images**: `.jpg` / `.jpeg`, `.png`, `.webp`, and `.avif` (where browser-native AVIF encoding is supported), validated by binary file signatures and actual decoding.
-- **Not yet supported**: `.mp4`, `.mp3`, `.zip`, `.gif`, and animated images (APNG / animated WebP / animated AVIF are rejected cleanly rather than dropping animation frames).
+- **Supported General Files & Folders (ZIP / GZIP)**: Arbitrary files (text, CSV, JSON, XML, source code, documents, binary files) and nested folders (`webkitdirectory` or directory drag-and-drop) compressed in a Web Worker using `fflate`:
+  - **ZIP**: `Fast` (DEFLATE level 1), `Balanced` (DEFLATE level 6), `Maximum` (DEFLATE level 9), and `Store only` (level 0). Already-compressed formats (`.zip`, `.jpg`, `.png`, `.docx`, etc.) automatically use `STORE` inside DEFLATE archives to avoid wasted CPU/memory.
+  - **GZIP (`.gz`)**: Single-file stream compression (`1f 8b`). Disabled when multiple files or folders are selected.
+- **Not yet supported**: Video (`.mp4`), audio (`.mp3`), `.gif`, and animated images (APNG / animated WebP / animated AVIF).
 - **Image compression methods**:
   - **PNG**: Uses `upng-js` for lossless deflate re-encoding (`Light`) and indexed palette quantization (`Balanced` / `Maximum`) while preserving alpha transparency.
   - **JPEG / WebP / AVIF**: Uses browser-native Canvas encoding (`0.90` / `0.78` / `0.55` defaults), custom quality slider, optional aspect-ratio-preserving max-dimension resizing, and bounded binary-search target size optimization.
@@ -55,8 +58,25 @@ If no smaller valid output can be produced, Gravipress retains the original PDF,
   - **PDF**: `100 MB` max file size, `200` pages, `8192 px` max page side, `24 MP` max rendered page pixels.
   - **Images**: `50 MB` max file size, `8192 px` max dimension, `32 MP` max decoded pixels (`~128 MB` RGBA) to protect desktop and mobile browser tabs.
   - **Batch Queue**: Up to `20` files per batch and `100 MB` combined input size, processed sequentially to prevent memory spikes. Supports per-file preset overrides, reordering, individual/batch cancellation, and retry of failed/cancelled items. Failed or cancelled files are excluded from aggregate savings and ZIP archives.
-- **ZIP Archives**: Built locally in-browser via `fflate` (`STORE` mode, `level: 0`) as `gravipress-compressed-files.zip`. Path traversal segments, control characters, and Windows reserved device names (`CON`, `NUL`, etc.) are sanitized, long filenames are bounded, and case-insensitive duplicate collisions are disambiguated (`name (1).ext`).
+- **General Archive & Folder Limits**: Up to `250` files, `100 MB` combined input, `50 MB` single file, and `12` directory levels. Empty directories are not included by browser `webkitdirectory` pickers. All archive paths are sanitized against traversal (`..`), drive/UNC prefixes, control characters, and Windows reserved device names.
 - **Browser Compatibility**: Automated E2E verified in Playwright Chromium (`7/7` suites), Firefox (`3/3` critical suites), and WebKit (`3/3` critical suites). Note that WebKit automation provides useful Safari-engine coverage but does not guarantee identical behavior on every iOS/macOS Safari release.
+
+## Phase 5 General File & Folder Compression Benchmarks
+
+Automated benchmarks measured across realistic, non-repetitive datasets in headless Chromium, Firefox, and WebKit (Safari engine) using DEFLATE Web Workers via `fflate`:
+
+| Dataset / Fixture                                       | Uncompressed            | Preset / Level    | Output Archive  | Space Saved (%)          | Processing Duration | Engine Mode            |
+| ------------------------------------------------------- | ----------------------- | ----------------- | --------------- | ------------------------ | ------------------- | ---------------------- |
+| **1 MB Text Document** (realistic technical prose)      | 1,048,665 B (1.00 MB)   | **Fast** (L1)     | 177.3 KB        | 82.7%                    | 68 ms               | ZIP DEFLATE            |
+| **1 MB Text Document**                                  | 1,048,665 B (1.00 MB)   | **Balanced** (L6) | 118.1 KB        | 88.5%                    | 110 ms              | ZIP DEFLATE            |
+| **1 MB Text Document**                                  | 1,048,665 B (1.00 MB)   | **Maximum** (L9)  | 117.2 KB        | 88.6%                    | 116 ms              | ZIP DEFLATE            |
+| **5 MB Telemetry CSV** (realistic metrics & timestamps) | 5,242,952 B (5.00 MB)   | **Fast** (L1)     | 1,000.8 KB      | 80.5%                    | 183 ms              | ZIP DEFLATE            |
+| **5 MB Telemetry CSV**                                  | 5,242,952 B (5.00 MB)   | **Balanced** (L6) | 770.3 KB        | 85.0%                    | 276 ms              | ZIP DEFLATE            |
+| **5 MB Telemetry CSV**                                  | 5,242,952 B (5.00 MB)   | **Maximum** (L9)  | 770.0 KB        | 85.0%                    | 337 ms              | ZIP DEFLATE            |
+| **10 MB Machine JSON** (deeply nested records & arrays) | 10,485,938 B (10.00 MB) | **Balanced** (L6) | 536.3 KB        | 94.8%                    | 287 ms              | ZIP DEFLATE            |
+| **10 MB Machine JSON**                                  | 10,485,938 B (10.00 MB) | **Maximum** (L9)  | 536.1 KB        | 94.8%                    | 322 ms              | ZIP DEFLATE            |
+| **256 KB Random Binary**                                | 262,144 B (256 KB)      | **Balanced** (L6) | 262.3 KB        | 0.0% (overhead reported) | 12 ms               | ZIP (Incompressible)   |
+| **Nested Folder Hierarchy** (multi-level tree)          | Variable                | **Balanced** (L6) | Exact hierarchy | Restored byte-for-byte   | < 50 ms             | ZIP / tar.exe verified |
 
 ## Licenses
 
