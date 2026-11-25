@@ -1,9 +1,16 @@
 import {
+  renderBatchQueue,
+  renderBatchSummary,
+} from './components/batch-workspace.js';
+import { BATCH_LIMITS, QUEUE_STATUS } from './config/batch-limits.js';
+import {
   COMPRESSION_PRESETS,
   PDF_LIMITS,
   UNSUPPORTED_FORMAT_PATTERN,
 } from './config/compression-presets.js';
 import { IMAGE_LIMITS, IMAGE_PRESETS } from './config/image-presets.js';
+import { buildBatchZip } from './engines/archive-builder.js';
+import { runBatchQueue } from './engines/batch-compressor.js';
 import { compressImage } from './engines/image-compressor.js';
 import { renderImagePreview } from './engines/image-preview.js';
 import { compressPdf } from './engines/pdf-compressor.js';
@@ -11,6 +18,7 @@ import {
   generateSamplePdfBytes,
   renderPdfFirstPagePreview,
 } from './engines/pdf-preview.js';
+import { createProcessingQueue } from './state/processing-queue.js';
 import { createFileBlob, triggerFileDownload } from './utils/download-utils.js';
 import {
   buildCompressedFilename,
@@ -31,7 +39,7 @@ import {
 
 let selectedFile = null;
 let selectedFileBytes = null;
-let selectedKind = null; // 'pdf' | 'image'
+let selectedKind = null; // 'pdf' | 'image' | 'batch'
 let selectedPageCount = 0;
 let selectedImageInfo = null;
 let hasDigitalSignature = false;
@@ -42,6 +50,12 @@ let useCustomQuality = false;
 let activeOperationId = 0;
 let activeAbortController = null;
 let isCompressing = false;
+
+let batchMode = false;
+const batchQueue = createProcessingQueue('Balanced');
+const itemAbortControllers = new Map();
+let lastZipInfo = null;
+let zipAbortController = null;
 
 // ============================================================================
 // DOM Helpers
@@ -95,7 +109,12 @@ function updateWarnings() {
   const mode = getSelectedMode();
   const warnings = [];
 
-  if (selectedKind !== 'image') {
+  if (batchMode) {
+    const preset = COMPRESSION_PRESETS[mode];
+    if (preset?.warning) {
+      warnings.push(preset.warning);
+    }
+  } else if (selectedKind !== 'image') {
     const preset = COMPRESSION_PRESETS[mode];
     if (preset?.warning) {
       warnings.push(preset.warning);
@@ -123,7 +142,7 @@ function updateWarnings() {
 
 function syncImageOptionsVisibility() {
   const optionsBox = getElement('image-options');
-  if (selectedKind !== 'image') {
+  if (batchMode || selectedKind !== 'image') {
     optionsBox.hidden = true;
     return;
   }
@@ -174,8 +193,9 @@ function setCompressionUiState(running) {
   cancelButton.hidden = !running;
 
   if (!running) {
-    startButton.firstElementChild.textContent =
-      selectedKind === 'image'
+    startButton.firstElementChild.textContent = batchMode
+      ? 'Compress batch'
+      : selectedKind === 'image'
         ? 'Compress image'
         : selectedKind === 'pdf'
           ? 'Compress PDF'
@@ -305,6 +325,123 @@ function renderResultMetrics(result) {
 }
 
 // ============================================================================
+// Batch Queue UI Integration
+// ============================================================================
+
+function syncBatchUi() {
+  const section = getElement('batch-section');
+  section.hidden = !batchMode;
+  getElement('batch-toggle').textContent = batchMode
+    ? 'Single mode'
+    : 'Batch mode';
+
+  if (!batchMode) {
+    return;
+  }
+
+  const items = batchQueue.getItems();
+  getElement('batch-count').textContent =
+    `${items.length} / ${BATCH_LIMITS.maxFiles} FILES`;
+
+  renderBatchQueue(
+    getElement('batch-list'),
+    batchQueue,
+    {
+      onPresetOverride: (id, preset) => {
+        batchQueue.setItemPresetOverride(id, preset);
+        syncBatchUi();
+      },
+      onMove: (id, delta) => {
+        batchQueue.moveItem(id, delta);
+        syncBatchUi();
+      },
+      onRemove: (id) => {
+        batchQueue.removeItem(id);
+        lastZipInfo = null;
+        syncBatchUi();
+      },
+      onCancelItem: (id) => {
+        const controller = itemAbortControllers.get(id);
+        if (controller) {
+          controller.abort();
+        }
+      },
+      onRetryItem: (id) => {
+        batchQueue.retryItem(id);
+        lastZipInfo = null;
+        syncBatchUi();
+      },
+      onDownloadItem: (id) => {
+        const item = batchQueue.getItem(id);
+        if (item?.outputBlob) {
+          triggerFileDownload(
+            item.outputBlob,
+            item.outputFilename || item.name
+          );
+        }
+      },
+    },
+    isCompressing
+  );
+
+  const summary = batchQueue.getAggregateSummary();
+  const summaryEl = getElement('batch-summary');
+  const hasProcessed =
+    summary.completedCount +
+      summary.unchangedCount +
+      summary.failedCount +
+      summary.cancelledCount >
+    0;
+
+  if (hasProcessed) {
+    renderBatchSummary(summaryEl, summary, lastZipInfo);
+    summaryEl.hidden = false;
+  } else {
+    summaryEl.hidden = true;
+  }
+
+  getElement('batch-download-zip').hidden =
+    isCompressing || !summary.hasDownloadableOutputs;
+  getElement('batch-retry-failed').hidden =
+    isCompressing || summary.failedCount + summary.cancelledCount === 0;
+}
+
+function enterBatchMode(files = []) {
+  if (!batchMode) {
+    cancelActiveOperation();
+    resetPressState();
+    clearImagePreview();
+    selectedFile = null;
+    selectedFileBytes = null;
+    selectedKind = 'batch';
+    batchMode = true;
+    syncImageOptionsVisibility();
+    updateWarnings();
+  }
+
+  if (files.length > 0) {
+    const { added, rejected } = batchQueue.addFiles(files);
+    lastZipInfo = null;
+    if (rejected.length > 0) {
+      showError(rejected.map((r) => r.reason).join(' '));
+    } else {
+      showError('');
+    }
+    if (added.length > 0) {
+      const count = batchQueue.getItems().length;
+      getElement('filelabel').textContent =
+        `${count} file${count === 1 ? '' : 's'} queued`;
+      getElement('filesub').textContent =
+        `${formatFileSize(batchQueue.totalInputBytes())} total • add more or compress`;
+      getElement('filename').textContent = `${count} files in batch queue`;
+    }
+  }
+
+  setCompressionUiState(false);
+  syncBatchUi();
+}
+
+// ============================================================================
 // File Selection & Cancellation
 // ============================================================================
 
@@ -314,6 +451,14 @@ function cancelActiveOperation() {
     activeAbortController.abort();
     activeAbortController = null;
   }
+  if (zipAbortController) {
+    zipAbortController.abort();
+    zipAbortController = null;
+  }
+  for (const controller of itemAbortControllers.values()) {
+    controller.abort();
+  }
+  itemAbortControllers.clear();
 }
 
 async function handleSelectedPdf(file, bytes, isSample = false) {
@@ -468,11 +613,18 @@ async function handleSelectedImage(file, bytes) {
   }
 }
 
-async function selectBrowserFile(file) {
-  if (!file) {
+async function selectBrowserFiles(fileList) {
+  const files = Array.from(fileList || []).filter(Boolean);
+  if (files.length === 0) {
     return;
   }
 
+  if (batchMode || files.length > 1) {
+    enterBatchMode(files);
+    return;
+  }
+
+  const file = files[0];
   try {
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
@@ -513,6 +665,12 @@ async function selectBrowserFile(file) {
 
 async function loadSamplePdf() {
   try {
+    if (batchMode) {
+      batchMode = false;
+      batchQueue.clear();
+      lastZipInfo = null;
+      syncBatchUi();
+    }
     showError('');
     getElement('status').textContent = 'GENERATING SAMPLE';
     const sampleBytes = await generateSamplePdfBytes();
@@ -541,9 +699,14 @@ function resetWorkspace() {
   compressionResult = null;
   useCustomQuality = false;
 
+  batchMode = false;
+  batchQueue.clear();
+  lastZipInfo = null;
+
   getElement('file').value = '';
-  getElement('filelabel').textContent = 'Drop your PDF or image here';
-  getElement('filesub').textContent = 'or click to browse your device';
+  getElement('filelabel').textContent = 'Drop your PDF, image, or batch here';
+  getElement('filesub').textContent =
+    'or click to browse your device (up to 20 files)';
   getElement('filename').textContent = 'Awaiting file';
   getElement('filemeta').hidden = true;
   getElement('filemeta').textContent = '';
@@ -552,11 +715,12 @@ function resetWorkspace() {
   updatePresetDescription();
   updateWarnings();
   setCompressionUiState(false);
+  syncBatchUi();
   showError('');
 }
 
 // ============================================================================
-// Compression Workflow
+// Compression Workflow (Single & Batch)
 // ============================================================================
 
 function waitForSettling(durationMs, signal) {
@@ -579,8 +743,118 @@ function waitForSettling(durationMs, signal) {
   });
 }
 
+async function startBatchCompression() {
+  const queued = batchQueue
+    .getItems()
+    .filter((item) => item.status === QUEUE_STATUS.QUEUED);
+  if (queued.length === 0) {
+    showError('Add at least one queued file to compress.');
+    return;
+  }
+
+  cancelActiveOperation();
+  const operationId = activeOperationId;
+  activeAbortController = new AbortController();
+  const { signal } = activeAbortController;
+  lastZipInfo = null;
+
+  showError('');
+  setCompressionUiState(true);
+  getElement('start').firstElementChild.textContent = 'Compressing batch…';
+  syncBatchUi();
+
+  const prefersReducedMotion = matchMedia(
+    '(prefers-reduced-motion: reduce)'
+  ).matches;
+
+  try {
+    await runBatchQueue(batchQueue, {
+      batchSignal: signal,
+      setItemAbortController: (id, controller) => {
+        if (controller) {
+          itemAbortControllers.set(id, controller);
+        } else {
+          itemAbortControllers.delete(id);
+        }
+      },
+      onQueueUpdated: () => {
+        if (operationId === activeOperationId) {
+          syncBatchUi();
+        }
+      },
+      onItemPreview: (item, previewUrl, metaText) => {
+        if (operationId !== activeOperationId) {
+          return;
+        }
+        getElement('filename').textContent = item.name;
+        getElement('filemeta').hidden = false;
+        getElement('filemeta').textContent =
+          `${metaText} • ${formatFileSize(item.originalSize)}`;
+        getElement('paperhead').textContent =
+          `${item.formatLabel || 'FILE'} / BATCH`;
+        const previewImage = getElement('image-preview');
+        previewImage.src = previewUrl;
+        previewImage.hidden = false;
+        getElement('paper').querySelector('.document').hidden = true;
+      },
+      onProgress: ({
+        itemIndex,
+        totalItems,
+        label,
+        progress,
+        indeterminate,
+      }) => {
+        if (operationId !== activeOperationId) {
+          return;
+        }
+        const overallPct =
+          ((itemIndex + progress / 100) / Math.max(1, totalItems)) * 100;
+        getElement('status').textContent =
+          `[${itemIndex + 1}/${totalItems}] ${label}`;
+        updateProgress(Math.min(95, overallPct), indeterminate);
+        setPressPosition(Math.min(0.95, progress / 100));
+      },
+      onItemSettled: async () => {
+        if (operationId !== activeOperationId) {
+          return;
+        }
+        setPressPosition(1);
+        if (!prefersReducedMotion) {
+          await waitForSettling(180, signal).catch(() => {});
+        }
+        setPressPosition(0);
+      },
+    });
+
+    if (operationId !== activeOperationId) {
+      return;
+    }
+
+    setPressPosition(0);
+    updateProgress(signal.aborted ? 0 : 100, false);
+    const summary = batchQueue.getAggregateSummary();
+    getElement('status').textContent = signal.aborted
+      ? 'BATCH CANCELLED'
+      : `BATCH COMPLETE (${summary.completedCount + summary.unchangedCount}/${summary.totalFiles})`;
+    setCompressionUiState(false);
+    syncBatchUi();
+  } catch (error) {
+    setPressPosition(0);
+    setCompressionUiState(false);
+    syncBatchUi();
+    if (error?.name !== 'AbortError') {
+      showError(error?.message || 'Batch compression failed.');
+    }
+  }
+}
+
 async function startCompression() {
   if (isCompressing) {
+    return;
+  }
+
+  if (batchMode) {
+    await startBatchCompression();
     return;
   }
 
@@ -713,6 +987,39 @@ function handleDownload() {
   }
 }
 
+async function handleBatchZipDownload() {
+  if (isCompressing) {
+    return;
+  }
+
+  const zipBtn = getElement('batch-download-zip');
+  zipBtn.disabled = true;
+  zipAbortController = new AbortController();
+  showError('');
+
+  try {
+    const archive = await buildBatchZip(batchQueue.getItems(), {
+      signal: zipAbortController.signal,
+      onProgress: ({ label, progress }) => {
+        getElement('status').textContent = label;
+        updateProgress(progress, false);
+      },
+    });
+    lastZipInfo = archive;
+    syncBatchUi();
+    updateProgress(100, false);
+    getElement('status').textContent = 'ZIP READY';
+    triggerFileDownload(archive.blob, BATCH_LIMITS.zipFilename);
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      showError(error?.message || 'Unable to create ZIP archive.');
+    }
+  } finally {
+    zipAbortController = null;
+    zipBtn.disabled = false;
+  }
+}
+
 // ============================================================================
 // Event Listeners
 // ============================================================================
@@ -727,9 +1034,9 @@ dropZone.onclick = () => {
 };
 
 fileInput.onchange = (event) => {
-  const file = event.target.files[0];
+  const files = Array.from(event.target.files || []);
   event.target.value = '';
-  selectBrowserFile(file);
+  selectBrowserFiles(files);
 };
 
 dropZone.ondragover = (event) => {
@@ -747,7 +1054,7 @@ dropZone.ondrop = (event) => {
   event.preventDefault();
   dropZone.classList.remove('drag');
   if (!isCompressing) {
-    selectBrowserFile(event.dataTransfer.files[0]);
+    selectBrowserFiles(event.dataTransfer.files);
   }
 };
 
@@ -757,8 +1064,27 @@ getElement('sample').onclick = () => {
   }
 };
 
+getElement('batch-toggle').onclick = () => {
+  if (isCompressing) {
+    return;
+  }
+  if (batchMode) {
+    resetWorkspace();
+  } else {
+    const existing = selectedFile ? [selectedFile] : [];
+    enterBatchMode(existing);
+  }
+};
+
 getElement('cancel').onclick = () => {
   cancelActiveOperation();
+  if (batchMode) {
+    setPressPosition(0);
+    setCompressionUiState(false);
+    getElement('status').textContent = 'BATCH CANCELLED';
+    syncBatchUi();
+    return;
+  }
   resetPressState();
   if (selectedFile && (selectedPageCount > 0 || selectedImageInfo)) {
     getElement('status').textContent = 'COMPRESSION CANCELLED';
@@ -767,12 +1093,32 @@ getElement('cancel').onclick = () => {
 
 getElement('reset').onclick = resetWorkspace;
 
+getElement('batch-clear').onclick = () => {
+  if (!isCompressing) {
+    resetWorkspace();
+  }
+};
+
+getElement('batch-retry-failed').onclick = () => {
+  if (!isCompressing) {
+    batchQueue.retryAllFailed();
+    lastZipInfo = null;
+    syncBatchUi();
+  }
+};
+
+getElement('batch-download-zip').onclick = handleBatchZipDownload;
+
 document.querySelectorAll('[name=mode]').forEach((input) => {
   input.onchange = () => {
     useCustomQuality = false;
+    batchQueue.setGlobalPreset(input.value);
     syncImageOptionsVisibility();
     updatePresetDescription();
     updateWarnings();
+    if (batchMode) {
+      syncBatchUi();
+    }
   };
 });
 
@@ -795,8 +1141,8 @@ getElement('download').onclick = handleDownload;
 getElement('about').onclick = () => {
   openDialog(
     'Less space. More room.',
-    'A local-first PDF and image compression utility. All parsing, ' +
-      'rendering, and compression run directly in your browser. Files are never uploaded.'
+    'A local-first PDF, image, and batch compression utility. All parsing, ' +
+      'rendering, compression, and ZIP packaging run directly in your browser. Files are never uploaded.'
   );
 };
 
@@ -807,3 +1153,4 @@ window.addEventListener('pagehide', () => {
 
 updatePresetDescription();
 updateWarnings();
+syncBatchUi();

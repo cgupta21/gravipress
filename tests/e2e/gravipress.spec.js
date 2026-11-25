@@ -1,6 +1,7 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { unzipSync } from 'fflate';
 import { PDFDocument } from 'pdf-lib';
 import { ensureTestFixtures } from './fixtures.js';
 
@@ -624,129 +625,179 @@ test('EXIF orientations 1-8 and JPEG PSNR visual quality verification', async ({
   console.log(`\nBALANCED_JPEG_PSNR=${exifResults.psnr.toFixed(2)} dB`);
 });
 
-test('EXIF orientations 1-8 and JPEG PSNR visual quality verification', async ({
+test('Phase 4 batch compression, mixed formats, error isolation, ZIP extraction, and 10-file benchmark', async ({
   page,
 }) => {
-  await page.goto('/');
+  test.setTimeout(180_000);
+  const consoleErrors = [];
+  const externalRequests = [];
 
-  // Create an asymmetric 120x80 JPEG and test all 8 EXIF orientation values
-  const exifResults = await page.evaluate(async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 120;
-    canvas.height = 80;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#2b2d21';
-    ctx.fillRect(0, 0, 120, 80);
-    ctx.fillStyle = '#ffc93c';
-    ctx.fillRect(0, 0, 30, 20);
-    const blob = await new Promise((res) =>
-      canvas.toBlob(res, 'image/jpeg', 0.95)
-    );
-    const baseJpeg = new Uint8Array(await blob.arrayBuffer());
-
-    function injectExifOrientation(jpegBytes, orientation) {
-      // Minimal TIFF/EXIF APP1 segment (little-endian) with Orientation tag 0x0112
-      const app1 = new Uint8Array([
-        0xff,
-        0xe1,
-        0x00,
-        0x22,
-        0x45,
-        0x78,
-        0x69,
-        0x66,
-        0x00,
-        0x00, // "Exif\0\0"
-        0x49,
-        0x49,
-        0x2a,
-        0x00,
-        0x08,
-        0x00,
-        0x00,
-        0x00, // TIFF II*
-        0x01,
-        0x00, // 1 IFD entry
-        0x12,
-        0x01,
-        0x03,
-        0x00,
-        0x01,
-        0x00,
-        0x00,
-        0x00,
-        orientation & 0xff,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-      ]);
-      const out = new Uint8Array(jpegBytes.length + app1.length);
-      out.set(jpegBytes.subarray(0, 2), 0);
-      out.set(app1, 2);
-      out.set(jpegBytes.subarray(2), 2 + app1.length);
-      return out;
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
     }
-
-    const dimsByOrientation = [];
-    for (let orientation = 1; orientation <= 8; orientation += 1) {
-      const oriented = injectExifOrientation(baseJpeg, orientation);
-      const bmp = await createImageBitmap(
-        new Blob([oriented], { type: 'image/jpeg' }),
-        { imageOrientation: 'from-image' }
-      );
-      dimsByOrientation.push({
-        orientation,
-        width: bmp.width,
-        height: bmp.height,
-      });
-      bmp.close();
+  });
+  page.on('request', (req) => {
+    const url = req.url();
+    if (
+      !url.startsWith('http://127.0.0.1:4173') &&
+      !url.startsWith('http://localhost:4173') &&
+      !url.startsWith('blob:') &&
+      !url.startsWith('data:')
+    ) {
+      externalRequests.push(url);
     }
-
-    // Compute PSNR between original 120x80 and 78% Balanced JPEG
-    const outBlob = await new Promise((res) =>
-      canvas.toBlob(res, 'image/jpeg', 0.78)
-    );
-    const origBmp = await createImageBitmap(blob);
-    const compBmp = await createImageBitmap(outBlob);
-    const c1 = document.createElement('canvas');
-    const c2 = document.createElement('canvas');
-    c1.width = c2.width = 120;
-    c1.height = c2.height = 80;
-    const g1 = c1.getContext('2d');
-    const g2 = c2.getContext('2d');
-    g1.drawImage(origBmp, 0, 0);
-    g2.drawImage(compBmp, 0, 0);
-    const d1 = g1.getImageData(0, 0, 120, 80).data;
-    const d2 = g2.getImageData(0, 0, 120, 80).data;
-    origBmp.close();
-    compBmp.close();
-
-    let mse = 0;
-    const channels = 120 * 80 * 3;
-    for (let i = 0; i < d1.length; i += 4) {
-      mse += (d1[i] - d2[i]) ** 2;
-      mse += (d1[i + 1] - d2[i + 1]) ** 2;
-      mse += (d1[i + 2] - d2[i + 2]) ** 2;
-    }
-    mse /= channels;
-    const psnr = mse === 0 ? 99 : 10 * Math.log10((255 * 255) / mse);
-
-    return { dimsByOrientation, psnr };
   });
 
-  for (const item of exifResults.dimsByOrientation) {
-    if (item.orientation >= 5) {
-      expect(item.width).toBe(80);
-      expect(item.height).toBe(120);
-    } else {
-      expect(item.width).toBe(120);
-      expect(item.height).toBe(80);
-    }
-  }
-  expect(exifResults.psnr).toBeGreaterThanOrEqual(28);
-  console.log(`\nBALANCED_JPEG_PSNR=${exifResults.psnr.toFixed(2)} dB`);
+  await page.goto('/');
+
+  const jpegPath = path.join(FIXTURES_DIR, 'photo-highres.jpg');
+  const webpPath = path.join(FIXTURES_DIR, 'photo-highres.webp');
+
+  // 1. Mixed batch with PDF, PNG, JPEG, WebP, and corrupted PDF
+  await page
+    .locator('#file')
+    .setInputFiles([
+      fixtures.textBased,
+      fixtures.transparentPng,
+      jpegPath,
+      webpPath,
+      fixtures.corrupted,
+    ]);
+
+  await expect(page.locator('#batch-section')).toBeVisible();
+  await expect(page.locator('#batch-count')).toHaveText('5 / 20 FILES');
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, '09-batch-queue.png'),
+    fullPage: true,
+  });
+
+  // Override preset on first item to Light
+  await page.locator('.batch-preset-select').first().selectOption('Light');
+
+  await page.locator('#start').click();
+  await expect(page.locator('#batch-download-zip')).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.locator('#batch-retry-failed')).toBeVisible();
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, '10-batch-completed.png'),
+    fullPage: true,
+  });
+
+  // Download ZIP and independently extract + verify entries
+  const zipDownloadPromise = page.waitForEvent('download');
+  await page.locator('#batch-download-zip').click();
+  const zipDownload = await zipDownloadPromise;
+  expect(zipDownload.suggestedFilename()).toBe(
+    'gravipress-compressed-files.zip'
+  );
+
+  const zipSavePath = path.join(FIXTURES_DIR, 'downloaded-batch.zip');
+  await zipDownload.saveAs(zipSavePath);
+  const zipBytes = new Uint8Array(fs.readFileSync(zipSavePath));
+  const extracted = unzipSync(zipBytes);
+  const entryNames = Object.keys(extracted);
+
+  expect(entryNames.length).toBe(4);
+  expect(entryNames).toContain('text-based-compressed.pdf');
+  expect(entryNames).toContain('transparent-graphic-compressed.png');
+  expect(entryNames).toContain('photo-highres-compressed.jpg');
+  expect(entryNames).toContain('photo-highres-compressed.webp');
+
+  const reopenedPdf = await PDFDocument.load(
+    extracted['text-based-compressed.pdf']
+  );
+  expect(reopenedPdf.getPageCount()).toBe(3);
+
+  const summaryText = await page.locator('#batch-summary').textContent();
+
+  // 2. 10-file mixed batch benchmark + duplicate filenames
+  await page.locator('#batch-clear').click();
+  await expect(page.locator('#batch-section')).toBeHidden();
+
+  await page
+    .locator('#file')
+    .setInputFiles([
+      fixtures.textBased,
+      fixtures.imageHeavy,
+      fixtures.scannedStyle,
+      fixtures.multiPage,
+      fixtures.portraitLandscape,
+      fixtures.rotatedPages,
+      fixtures.transparentPng,
+      fixtures.noisyPng,
+      jpegPath,
+      webpPath,
+    ]);
+  await expect(page.locator('#batch-count')).toHaveText('10 / 20 FILES');
+
+  const batchStart = Date.now();
+  await page.locator('#start').click();
+  await expect(page.locator('#batch-download-zip')).toBeVisible({
+    timeout: 90_000,
+  });
+  const batchDurationMs = Date.now() - batchStart;
+
+  const zip10Promise = page.waitForEvent('download');
+  await page.locator('#batch-download-zip').click();
+  const zip10 = await zip10Promise;
+  const zip10Path = path.join(FIXTURES_DIR, 'downloaded-batch-10.zip');
+  await zip10.saveAs(zip10Path);
+  const zip10Bytes = fs.readFileSync(zip10Path);
+  const extracted10 = unzipSync(new Uint8Array(zip10Bytes));
+  expect(Object.keys(extracted10).length).toBe(10);
+
+  const tenSummary = await page.locator('#batch-summary dd').allTextContents();
+
+  // 3. 20-file maximum batch + 21st file rejection + memory measurement
+  await page.locator('#batch-clear').click();
+  const twentyFiles = Array.from({ length: 21 }, (_, idx) =>
+    idx % 2 === 0 ? fixtures.textBased : fixtures.transparentPng
+  );
+  await page.locator('#file').setInputFiles(twentyFiles);
+  await expect(page.locator('#error')).toContainText('Batch limit of 20 files');
+  await expect(page.locator('#batch-count')).toHaveText('20 / 20 FILES');
+
+  const maxBatchStart = Date.now();
+  await page.locator('#start').click();
+  await expect(page.locator('#batch-download-zip')).toBeVisible({
+    timeout: 90_000,
+  });
+  const maxBatchDurationMs = Date.now() - maxBatchStart;
+
+  const heapInfo = await page.evaluate(() => {
+    const mem = performance.memory;
+    return mem
+      ? {
+          usedJSHeapMB: Number((mem.usedJSHeapSize / 1048576).toFixed(2)),
+          totalJSHeapMB: Number((mem.totalJSHeapSize / 1048576).toFixed(2)),
+        }
+      : null;
+  });
+
+  // 4. Test batch cancellation mid-run
+  await page.locator('#batch-clear').click();
+  await page
+    .locator('#file')
+    .setInputFiles([fixtures.largePdf, fixtures.large6Mb, fixtures.noisyPng]);
+  await page.locator('#start').click();
+  await expect(page.locator('#cancel')).toBeVisible();
+  await page.locator('#cancel').click();
+  await expect(page.locator('#status')).toHaveText('BATCH CANCELLED');
+
+  console.log(
+    '\nBATCH_BENCHMARK_JSON=' +
+      JSON.stringify({
+        fiveMixedSummary: summaryText,
+        tenMixedDurationMs: batchDurationMs,
+        tenMixedSummary: tenSummary,
+        tenMixedZipBytes: zip10Bytes.byteLength,
+        twentyMaxDurationMs: maxBatchDurationMs,
+        heapInfo,
+      })
+  );
+
+  expect(externalRequests).toEqual([]);
+  expect(consoleErrors).toEqual([]);
 });

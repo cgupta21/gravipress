@@ -411,6 +411,111 @@ legend {
 }
 
 /* ==========================================================================
+   Batch Queue Workspace
+   ========================================================================== */
+
+.batch-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #2b2d2140;
+}
+
+.batch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.batch-row {
+  border: 1px solid #2b2d2140;
+  background: #eeeee8;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.batch-row[data-status='failed'] {
+  border-color: #a02a20;
+}
+
+.batch-row[data-status='completed'] {
+  border-color: var(--olive);
+}
+
+.batch-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.batch-badge {
+  font: 10px monospace;
+  background: var(--olive);
+  color: var(--yellow);
+  padding: 2px 5px;
+  flex-shrink: 0;
+}
+
+.batch-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-size {
+  font: 11px monospace;
+  color: #55594c;
+  flex-shrink: 0;
+}
+
+.batch-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.batch-status {
+  color: #55594c;
+}
+
+.batch-row[data-status='failed'] .batch-status {
+  color: #a02a20;
+}
+
+.batch-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-preset-select {
+  border: 1px solid var(--olive);
+  background: var(--white);
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.batch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ==========================================================================
    Hydraulic Press Machine & Synchronized Animation
    ========================================================================== */
 

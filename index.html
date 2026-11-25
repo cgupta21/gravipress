@@ -46,7 +46,7 @@
       </a>
       <div class="nav-right">
         <button class="link" id="about">About</button>
-        <span class="version">V.03</span>
+        <span class="version">V.04</span>
       </div>
     </header>
 
@@ -74,6 +74,7 @@
             type="file"
             id="file"
             hidden
+            multiple
             accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.avif,image/avif,.mp4,.mp3,.zip"
           />
 
@@ -88,8 +89,10 @@
             >
               <path d="M12 16V3m-5 5 5-5 5 5M3 16v5h18v-5" />
             </svg>
-            <strong id="filelabel">Drop your PDF or image here</strong>
-            <span id="filesub">or click to browse your device</span>
+            <strong id="filelabel">Drop your PDF, image, or batch here</strong>
+            <span id="filesub"
+              >or click to browse your device (up to 20 files)</span
+            >
           </button>
 
           <div class="types">
@@ -210,6 +213,9 @@
             <button class="link" id="sample" type="button">
               Try sample PDF
             </button>
+            <button class="link" id="batch-toggle" type="button">
+              Batch mode
+            </button>
             <button class="link" id="cancel" type="button" hidden>
               Cancel compression
             </button>
@@ -219,6 +225,39 @@
           </div>
 
           <p id="error" role="alert" hidden></p>
+
+          <section class="batch-section" id="batch-section" hidden>
+            <div class="micro">
+              <span>BATCH QUEUE</span>
+              <span id="batch-count">0 / 20 FILES</span>
+            </div>
+            <ul class="batch-list" id="batch-list"></ul>
+            <dl class="metrics batch-summary" id="batch-summary" hidden></dl>
+            <div class="batch-actions">
+              <button
+                class="action"
+                id="batch-download-zip"
+                type="button"
+                hidden
+              >
+                <span>Download ZIP</span>
+                <span aria-hidden="true">↓</span>
+              </button>
+              <div class="minor">
+                <button
+                  class="link"
+                  id="batch-retry-failed"
+                  type="button"
+                  hidden
+                >
+                  Retry failed
+                </button>
+                <button class="link" id="batch-clear" type="button">
+                  Clear queue
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="machine-area">

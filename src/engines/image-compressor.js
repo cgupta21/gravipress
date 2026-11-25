@@ -170,7 +170,7 @@ export async function compressImage(file, originalBytes, options = {}) {
           ? [0]
           : mode === 'Balanced'
             ? [0, 256]
-            : [128, 64];
+            : [0, 128, 64];
 
       for (let i = 0; i < colorOptions.length; i += 1) {
         throwIfAborted(signal);

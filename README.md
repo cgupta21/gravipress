@@ -54,10 +54,13 @@ If no smaller valid output can be produced, Gravipress retains the original PDF,
 - **Safety & memory limits**:
   - **PDF**: `100 MB` max file size, `200` pages, `8192 px` max page side, `24 MP` max rendered page pixels.
   - **Images**: `50 MB` max file size, `8192 px` max dimension, `32 MP` max decoded pixels (`~128 MB` RGBA) to protect desktop and mobile browser tabs.
+  - **Batch Queue**: Up to `20` files per batch and `100 MB` combined input size, processed sequentially to prevent memory spikes. Supports per-file preset overrides, reordering, individual/batch cancellation, and retry of failed/cancelled items. Failed or cancelled files are excluded from aggregate savings and ZIP archives.
+- **ZIP Archives**: Built locally in-browser via `fflate` (`STORE` mode, `level: 0`) as `gravipress-compressed-files.zip`. Path traversal segments, control characters, and Windows reserved device names (`CON`, `NUL`, etc.) are sanitized, long filenames are bounded, and case-insensitive duplicate collisions are disambiguated (`name (1).ext`).
+- **Browser Compatibility**: Automated E2E verified in Playwright Chromium (`7/7` suites), Firefox (`3/3` critical suites), and WebKit (`3/3` critical suites). Note that WebKit automation provides useful Safari-engine coverage but does not guarantee identical behavior on every iOS/macOS Safari release.
 
 ## Licenses
 
-- `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), `upng-js` (MIT), `pako` (MIT).
+- `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), `upng-js` (MIT), `pako` (MIT), `fflate` (MIT).
 
 ## Structure
 
