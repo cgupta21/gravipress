@@ -80,7 +80,7 @@ test('file-utils validates PDF headers, unsupported formats, and signatures', ()
     false
   );
 
-  for (const ext of ['jpg', 'png', 'webp', 'mp4', 'mp3', 'zip']) {
+  for (const ext of ['mp4', 'mp3', 'zip']) {
     const check = validatePdfFile(
       { name: `file.${ext}`, size: 10 },
       new Uint8Array(10)

@@ -51,4 +51,4 @@ export const PDF_LIMITS = {
   minSettlingDurationMs: 450,
 };
 
-export const UNSUPPORTED_FORMAT_PATTERN = /\.(jpe?g|png|webp|mp4|mp3|zip)$/i;
+export const UNSUPPORTED_FORMAT_PATTERN = /\.(mp4|mp3|zip)$/i;

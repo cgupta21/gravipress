@@ -40,6 +40,27 @@ export function calculateSavings(originalSize, compressedSize) {
   };
 }
 
+export function formatPercentageReduction(
+  percentage,
+  originalSize,
+  compressedSize
+) {
+  if (
+    !Number.isFinite(percentage) ||
+    percentage <= 0 ||
+    compressedSize >= originalSize
+  ) {
+    return '0.0%';
+  }
+
+  if (compressedSize > 0 && percentage >= 99.95) {
+    const capped = Math.min(99.99, percentage);
+    return `${capped.toFixed(2)}%`;
+  }
+
+  return `${percentage.toFixed(1)}%`;
+}
+
 export function hasPdfHeader(bytes) {
   if (
     !(bytes instanceof Uint8Array) ||
@@ -66,7 +87,7 @@ export function validatePdfFile(file, bytes) {
     const extension = file.name.split('.').pop().toUpperCase();
     return {
       valid: false,
-      error: `${extension} compression is not yet supported. Phase 2 supports PDF files only.`,
+      error: `${extension} compression is not yet supported. Gravipress currently supports PDF, JPG, PNG, WebP, and AVIF.`,
     };
   }
 

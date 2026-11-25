@@ -34,16 +34,30 @@ If no smaller valid output can be produced, Gravipress retains the original PDF,
 
 ## Supported formats & privacy
 
-- **Supported now**: PDF (`.pdf`, validated by file header).
-- **Not yet supported**: JPG, PNG, WebP, MP4, MP3, and ZIP (clearly blocked with a status message).
+- **Supported PDF**: `.pdf` (validated by `%PDF-` header).
+- **Supported Images**: `.jpg` / `.jpeg`, `.png`, `.webp`, and `.avif` (where browser-native AVIF encoding is supported), validated by binary file signatures and actual decoding.
+- **Not yet supported**: `.mp4`, `.mp3`, `.zip`, `.gif`, and animated images (APNG / animated WebP / animated AVIF are rejected cleanly rather than dropping animation frames).
+- **Image compression methods**:
+  - **PNG**: Uses `upng-js` for lossless deflate re-encoding (`Light`) and indexed palette quantization (`Balanced` / `Maximum`) while preserving alpha transparency.
+  - **JPEG / WebP / AVIF**: Uses browser-native Canvas encoding (`0.90` / `0.78` / `0.55` defaults), custom quality slider, optional aspect-ratio-preserving max-dimension resizing, and bounded binary-search target size optimization.
+  - **Metadata**: Browser Canvas/UPNG re-encoding removes EXIF/IPTC/XMP metadata and normalizes output to sRGB.
 - **Privacy**: All parsing, preview rendering, and compression execute 100% locally in your browser. No files are uploaded to external servers, and no uploaded files are persisted in `localStorage` or `IndexedDB`. All PDF.js worker, CMap, and standard font assets are bundled locally.
 
-## Known limitations
+## Known limitations & browser compatibility
 
-- Rasterized modes (`Balanced` and `Maximum`) convert pages to JPEG images, removing selectable text, links, forms, and accessibility structure.
-- Password-protected or encrypted PDFs are rejected; encryption is never bypassed.
-- Processing a digitally signed PDF can invalidate existing signatures (a warning is shown when signature markers are detected).
-- Browser memory limits apply (default limits: 100 MB file size, 200 pages, and 24 MP per rendered page).
+- **Rasterized PDF modes (`Balanced` / `Maximum`)**: When applied to image-heavy PDFs, pages are converted to JPEG images, removing selectable text, links, forms, and accessibility structure.
+- **Encrypted PDFs**: Password-protected or encrypted PDFs are rejected; encryption is never bypassed.
+- **Digital signatures**: Processing a digitally signed PDF can invalidate existing signatures (a warning is shown when signature markers are detected).
+- **AVIF encoding**: AVIF compression relies on browser-native `canvas.toBlob('image/avif')` support (available in modern desktop Chromium/Firefox builds, but not all headless or Safari environments). Unsupported browsers receive an explicit error rather than a silent format fallback.
+- **Image metadata & color space**: Browser Canvas and `upng-js` encoding strips EXIF/IPTC/XMP metadata and normalizes output to sRGB.
+- **Target size mode**: Target sizes are approached via bounded adaptive quality/palette search (`6` attempts max). If a target cannot be reached within permitted quality/dimension bounds, Gravipress returns the best smaller candidate and reports that the target was not met.
+- **Safety & memory limits**:
+  - **PDF**: `100 MB` max file size, `200` pages, `8192 px` max page side, `24 MP` max rendered page pixels.
+  - **Images**: `50 MB` max file size, `8192 px` max dimension, `32 MP` max decoded pixels (`~128 MB` RGBA) to protect desktop and mobile browser tabs.
+
+## Licenses
+
+- `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), `upng-js` (MIT), `pako` (MIT).
 
 ## Structure
 

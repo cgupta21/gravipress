@@ -1,14 +1,14 @@
-export function createPdfBlob(bytes) {
+export function createFileBlob(bytes, mimeType) {
   if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
-    throw new Error('Cannot create a PDF download from empty data.');
+    throw new Error('Cannot create a download from empty data.');
   }
 
-  return new Blob([bytes], { type: 'application/pdf' });
+  return new Blob([bytes], { type: mimeType });
 }
 
-export function triggerPdfDownload(blob, filename) {
+export function triggerFileDownload(blob, filename) {
   if (!(blob instanceof Blob) || blob.size === 0) {
-    throw new Error('Cannot download an empty PDF file.');
+    throw new Error('Cannot download an empty file.');
   }
 
   const objectUrl = URL.createObjectURL(blob);
@@ -23,4 +23,12 @@ export function triggerPdfDownload(blob, filename) {
   setTimeout(() => {
     URL.revokeObjectURL(objectUrl);
   }, 1500);
+}
+
+export function createPdfBlob(bytes) {
+  return createFileBlob(bytes, 'application/pdf');
+}
+
+export function triggerPdfDownload(blob, filename) {
+  triggerFileDownload(blob, filename);
 }

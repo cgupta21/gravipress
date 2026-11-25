@@ -1,19 +1,29 @@
 import {
   COMPRESSION_PRESETS,
   PDF_LIMITS,
+  UNSUPPORTED_FORMAT_PATTERN,
 } from './config/compression-presets.js';
+import { IMAGE_LIMITS, IMAGE_PRESETS } from './config/image-presets.js';
+import { compressImage } from './engines/image-compressor.js';
+import { renderImagePreview } from './engines/image-preview.js';
 import { compressPdf } from './engines/pdf-compressor.js';
 import {
   generateSamplePdfBytes,
   renderPdfFirstPagePreview,
 } from './engines/pdf-preview.js';
-import { createPdfBlob, triggerPdfDownload } from './utils/download-utils.js';
+import { createFileBlob, triggerFileDownload } from './utils/download-utils.js';
 import {
   buildCompressedFilename,
   detectDigitalSignature,
   formatFileSize,
+  formatPercentageReduction,
+  hasPdfHeader,
   validatePdfFile,
 } from './utils/file-utils.js';
+import {
+  buildCompressedImageFilename,
+  detectImageFormat,
+} from './utils/image-utils.js';
 
 // ============================================================================
 // State
@@ -21,10 +31,14 @@ import {
 
 let selectedFile = null;
 let selectedFileBytes = null;
+let selectedKind = null; // 'pdf' | 'image'
 let selectedPageCount = 0;
+let selectedImageInfo = null;
 let hasDigitalSignature = false;
 let previewObjectUrl = null;
+let compressedPreviewUrl = null;
 let compressionResult = null;
+let useCustomQuality = false;
 let activeOperationId = 0;
 let activeAbortController = null;
 let isCompressing = false;
@@ -62,17 +76,38 @@ function showError(message) {
   errorElement.hidden = !message;
 }
 
+function updatePresetDescription() {
+  const mode = getSelectedMode();
+  if (selectedKind === 'image') {
+    const preset = IMAGE_PRESETS[mode];
+    if (preset) {
+      getElement('quality').textContent = preset.description;
+    }
+  } else {
+    const preset = COMPRESSION_PRESETS[mode];
+    if (preset) {
+      getElement('quality').textContent = preset.description;
+    }
+  }
+}
+
 function updateWarnings() {
-  const preset = COMPRESSION_PRESETS[getSelectedMode()];
+  const mode = getSelectedMode();
   const warnings = [];
 
-  if (preset?.warning) {
-    warnings.push(preset.warning);
-  }
-
-  if (hasDigitalSignature) {
+  if (selectedKind !== 'image') {
+    const preset = COMPRESSION_PRESETS[mode];
+    if (preset?.warning) {
+      warnings.push(preset.warning);
+    }
+    if (hasDigitalSignature) {
+      warnings.push(
+        'Digital signature detected: processing this PDF can invalidate existing signatures.'
+      );
+    }
+  } else if (selectedImageInfo?.format === 'PNG' && mode !== 'Light') {
     warnings.push(
-      'Digital signature detected: processing this PDF can invalidate existing signatures.'
+      `${mode} mode uses indexed palette quantization for PNG to reduce file size while preserving transparency.`
     );
   }
 
@@ -84,6 +119,44 @@ function updateWarnings() {
     warningElement.textContent = '';
     warningElement.hidden = true;
   }
+}
+
+function syncImageOptionsVisibility() {
+  const optionsBox = getElement('image-options');
+  if (selectedKind !== 'image') {
+    optionsBox.hidden = true;
+    return;
+  }
+
+  optionsBox.hidden = false;
+  const isPng = selectedImageInfo?.format === 'PNG';
+  getElement('quality-row').hidden = isPng;
+
+  if (!useCustomQuality) {
+    const preset = IMAGE_PRESETS[getSelectedMode()];
+    const pct = Math.round((preset?.lossyQuality || 0.78) * 100);
+    getElement('custom-quality').value = String(pct);
+    getElement('custom-quality-value').textContent = `${pct}%`;
+  }
+}
+
+function getTargetSizeBytes() {
+  const selectValue = getElement('target-size').value;
+  if (!selectValue) {
+    return null;
+  }
+
+  if (selectValue === 'custom') {
+    const raw = Number(getElement('custom-target-value').value);
+    const unit = getElement('custom-target-unit').value;
+    if (!Number.isFinite(raw) || raw <= 0) {
+      return null;
+    }
+    return Math.round(raw * (unit === 'MB' ? 1048576 : 1024));
+  }
+
+  const kb = Number(selectValue);
+  return Number.isFinite(kb) && kb > 0 ? kb * 1024 : null;
 }
 
 function openDialog(title, text) {
@@ -101,7 +174,12 @@ function setCompressionUiState(running) {
   cancelButton.hidden = !running;
 
   if (!running) {
-    startButton.firstElementChild.textContent = 'Compress PDF';
+    startButton.firstElementChild.textContent =
+      selectedKind === 'image'
+        ? 'Compress image'
+        : selectedKind === 'pdf'
+          ? 'Compress PDF'
+          : 'Compress file';
   }
 }
 
@@ -109,11 +187,22 @@ function setCompressionUiState(running) {
 // Preview & Results Rendering
 // ============================================================================
 
+function clearCompressedPreview() {
+  if (compressedPreviewUrl) {
+    URL.revokeObjectURL(compressedPreviewUrl);
+  }
+  compressedPreviewUrl = null;
+  getElement('comparison').hidden = true;
+  getElement('compare-before').removeAttribute('src');
+  getElement('compare-after').removeAttribute('src');
+}
+
 function clearImagePreview() {
   if (previewObjectUrl) {
     URL.revokeObjectURL(previewObjectUrl);
   }
   previewObjectUrl = null;
+  clearCompressedPreview();
 
   const previewImage = getElement('image-preview');
   previewImage.hidden = true;
@@ -125,6 +214,7 @@ function clearImagePreview() {
 function resetPressState() {
   setPressPosition(0);
   updateProgress(0, false);
+  clearCompressedPreview();
   getElement('result').hidden = true;
   getElement('metrics').innerHTML = '';
   getElement('status').textContent = 'SYSTEM READY';
@@ -135,18 +225,37 @@ function renderResultMetrics(result) {
   const metricsElement = getElement('metrics');
   metricsElement.innerHTML = '';
 
+  const pctText = formatPercentageReduction(
+    result.percentageSaved,
+    result.originalSize,
+    result.compressedSize
+  );
+
   const reductionText = result.wasReduced
-    ? `${formatFileSize(result.bytesSaved)} (${result.percentageSaved.toFixed(1)}%)`
+    ? `${formatFileSize(result.bytesSaved)} (${pctText})`
     : '0 B (0.0%)';
 
-  const entries = [
-    ['ORIGINAL', formatFileSize(result.originalSize)],
-    ['OUTPUT', formatFileSize(result.compressedSize)],
-    ['SAVED', reductionText],
-    ['DURATION', `${result.durationMs} ms`],
-    ['PAGES', String(result.pageCount)],
-    ['METHOD', result.methodUsed || result.mode],
-  ];
+  const entries =
+    result.kind === 'image'
+      ? [
+          ['ORIGINAL', formatFileSize(result.originalSize)],
+          ['OUTPUT', formatFileSize(result.compressedSize)],
+          ['SAVED', reductionText],
+          [
+            'DIMENSIONS',
+            `${result.originalWidth}×${result.originalHeight} → ${result.outputWidth}×${result.outputHeight}`,
+          ],
+          ['DURATION', `${result.durationMs} ms`],
+          ['METHOD', result.methodUsed],
+        ]
+      : [
+          ['ORIGINAL', formatFileSize(result.originalSize)],
+          ['OUTPUT', formatFileSize(result.compressedSize)],
+          ['SAVED', reductionText],
+          ['DURATION', `${result.durationMs} ms`],
+          ['PAGES', String(result.pageCount)],
+          ['METHOD', result.methodUsed || result.mode],
+        ];
 
   for (const [label, value] of entries) {
     const wrapper = document.createElement('div');
@@ -161,16 +270,35 @@ function renderResultMetrics(result) {
   const titleElement = getElement('result-title');
   const summaryElement = getElement('result-summary');
   const downloadButton = getElement('download');
+  const extLabel = result.kind === 'image' ? result.format : 'PDF';
 
   if (result.wasReduced) {
     titleElement.textContent = 'Press complete.';
-    summaryElement.textContent = `Reduced by ${result.percentageSaved.toFixed(1)}% (${formatFileSize(result.bytesSaved)} saved) via ${result.methodUsed}.`;
-    downloadButton.firstChild.textContent = 'Download compressed PDF ';
+    let summary = `Reduced by ${pctText} (${formatFileSize(result.bytesSaved)} saved) via ${result.methodUsed}.`;
+    if (result.targetSizeBytes && result.targetAchieved === false) {
+      summary += ` Target of ${formatFileSize(result.targetSizeBytes)} could not be reached within quality/dimension limits.`;
+    }
+    summaryElement.textContent = summary;
+    downloadButton.firstChild.textContent = `Download compressed ${extLabel} `;
   } else {
     titleElement.textContent = 'No reduction possible.';
     summaryElement.textContent =
       'No smaller acceptable output could be produced. Original file retained.';
-    downloadButton.firstChild.textContent = 'Download original PDF ';
+    downloadButton.firstChild.textContent = `Download original ${extLabel} `;
+  }
+
+  if (result.kind === 'image' && previewObjectUrl) {
+    compressedPreviewUrl = URL.createObjectURL(
+      createFileBlob(result.bytes, result.mimeType)
+    );
+    getElement('compare-before').src = previewObjectUrl;
+    getElement('compare-after').src = compressedPreviewUrl;
+    getElement('compare-after-label').textContent = result.wasReduced
+      ? 'Compressed'
+      : 'Unchanged';
+    getElement('comparison').hidden = false;
+  } else {
+    clearCompressedPreview();
   }
 
   getElement('result').hidden = false;
@@ -198,11 +326,16 @@ async function handleSelectedPdf(file, bytes, isSample = false) {
   clearImagePreview();
   showError('');
   compressionResult = null;
+  selectedKind = 'pdf';
+  selectedImageInfo = null;
+  syncImageOptionsVisibility();
+  updatePresetDescription();
 
   const validation = validatePdfFile(file, bytes);
   if (!validation.valid) {
     selectedFile = null;
     selectedFileBytes = null;
+    selectedKind = null;
     selectedPageCount = 0;
     hasDigitalSignature = false;
     updateWarnings();
@@ -214,6 +347,7 @@ async function handleSelectedPdf(file, bytes, isSample = false) {
   selectedFileBytes = bytes;
   hasDigitalSignature = detectDigitalSignature(bytes);
   updateWarnings();
+  setCompressionUiState(false);
 
   getElement('filename').textContent = file.name;
   getElement('filelabel').textContent = file.name;
@@ -254,13 +388,83 @@ async function handleSelectedPdf(file, bytes, isSample = false) {
 
     selectedFile = null;
     selectedFileBytes = null;
+    selectedKind = null;
     selectedPageCount = 0;
     hasDigitalSignature = false;
     updateWarnings();
     getElement('filemeta').hidden = true;
-    getElement('filename').textContent = 'Awaiting PDF';
+    getElement('filename').textContent = 'Awaiting file';
     getElement('status').textContent = 'SYSTEM READY';
     showError(error.message || 'Unable to load PDF preview.');
+  }
+}
+
+async function handleSelectedImage(file, bytes) {
+  cancelActiveOperation();
+  const operationId = activeOperationId;
+  activeAbortController = new AbortController();
+  const { signal } = activeAbortController;
+
+  resetPressState();
+  clearImagePreview();
+  showError('');
+  compressionResult = null;
+  selectedKind = 'image';
+  selectedPageCount = 0;
+  hasDigitalSignature = false;
+  useCustomQuality = false;
+
+  selectedFile = file;
+  selectedFileBytes = bytes;
+  getElement('filename').textContent = file.name;
+  getElement('filelabel').textContent = file.name;
+  getElement('filesub').textContent = formatFileSize(bytes.byteLength);
+  getElement('paperhead').textContent = 'IMG / 001';
+  getElement('status').textContent = 'DECODING PREVIEW';
+  getElement('filemeta').hidden = false;
+  getElement('filemeta').textContent =
+    `Decoding image • ${formatFileSize(bytes.byteLength)}`;
+
+  try {
+    const preview = await renderImagePreview(file, bytes, signal);
+    if (operationId !== activeOperationId) {
+      URL.revokeObjectURL(preview.previewUrl);
+      return;
+    }
+
+    selectedImageInfo = preview;
+    previewObjectUrl = preview.previewUrl;
+
+    const previewImage = getElement('image-preview');
+    previewImage.src = previewObjectUrl;
+    previewImage.hidden = false;
+    getElement('paper').querySelector('.document').hidden = true;
+    previewImage.onerror = () => clearImagePreview();
+
+    const alphaLabel = preview.hasAlpha ? ' • Alpha' : '';
+    getElement('filemeta').textContent =
+      `${preview.format} • ${preview.width}×${preview.height}${alphaLabel} • ${formatFileSize(bytes.byteLength)}`;
+    getElement('status').textContent = 'SYSTEM READY';
+
+    syncImageOptionsVisibility();
+    updatePresetDescription();
+    updateWarnings();
+    setCompressionUiState(false);
+  } catch (error) {
+    if (error?.name === 'AbortError' || operationId !== activeOperationId) {
+      return;
+    }
+
+    selectedFile = null;
+    selectedFileBytes = null;
+    selectedKind = null;
+    selectedImageInfo = null;
+    syncImageOptionsVisibility();
+    updateWarnings();
+    getElement('filemeta').hidden = true;
+    getElement('filename').textContent = 'Awaiting file';
+    getElement('status').textContent = 'SYSTEM READY';
+    showError(error.message || 'Unable to decode image preview.');
   }
 }
 
@@ -272,7 +476,36 @@ async function selectBrowserFile(file) {
   try {
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-    await handleSelectedPdf(file, bytes, false);
+
+    if (UNSUPPORTED_FORMAT_PATTERN.test(file.name)) {
+      const ext = file.name.split('.').pop().toUpperCase();
+      resetWorkspace();
+      showError(
+        `${ext} compression is not yet supported. Gravipress supports PDF, JPG, PNG, WebP, and AVIF.`
+      );
+      return;
+    }
+
+    if (bytes.length === 0) {
+      resetWorkspace();
+      showError('The selected file is empty (0 bytes).');
+      return;
+    }
+
+    if (hasPdfHeader(bytes)) {
+      await handleSelectedPdf(file, bytes, false);
+      return;
+    }
+
+    if (detectImageFormat(bytes)) {
+      await handleSelectedImage(file, bytes);
+      return;
+    }
+
+    resetWorkspace();
+    showError(
+      'Invalid or unsupported file. Contents do not match a valid PDF, JPEG, PNG, WebP, or AVIF signature.'
+    );
   } catch {
     showError('Could not read the selected file from disk.');
   }
@@ -301,18 +534,24 @@ function resetWorkspace() {
 
   selectedFile = null;
   selectedFileBytes = null;
+  selectedKind = null;
   selectedPageCount = 0;
+  selectedImageInfo = null;
   hasDigitalSignature = false;
   compressionResult = null;
+  useCustomQuality = false;
 
   getElement('file').value = '';
-  getElement('filelabel').textContent = 'Drop your PDF here';
+  getElement('filelabel').textContent = 'Drop your PDF or image here';
   getElement('filesub').textContent = 'or click to browse your device';
-  getElement('filename').textContent = 'Awaiting PDF';
+  getElement('filename').textContent = 'Awaiting file';
   getElement('filemeta').hidden = true;
   getElement('filemeta').textContent = '';
   getElement('paperhead').textContent = 'DOCUMENT 001';
+  syncImageOptionsVisibility();
+  updatePresetDescription();
   updateWarnings();
+  setCompressionUiState(false);
   showError('');
 }
 
@@ -345,8 +584,8 @@ async function startCompression() {
     return;
   }
 
-  if (!selectedFile || !selectedFileBytes) {
-    showError('Select a valid PDF file or try the sample PDF first.');
+  if (!selectedFile || !selectedFileBytes || !selectedKind) {
+    showError('Select a valid PDF or image file, or try the sample PDF first.');
     return;
   }
 
@@ -370,17 +609,39 @@ async function startCompression() {
   ).matches;
 
   try {
-    const result = await compressPdf(selectedFileBytes, mode, {
-      signal,
-      onProgress: ({ label, progress, indeterminate }) => {
-        if (operationId !== activeOperationId) {
-          return;
-        }
-        getElement('status').textContent = label;
-        updateProgress(Math.min(95, progress), indeterminate);
-        setPressPosition(Math.min(0.92, progress / 100));
-      },
-    });
+    const onProgress = ({ label, progress, indeterminate }) => {
+      if (operationId !== activeOperationId) {
+        return;
+      }
+      getElement('status').textContent = label;
+      updateProgress(Math.min(95, progress), indeterminate);
+      setPressPosition(Math.min(0.92, progress / 100));
+    };
+
+    let result;
+    if (selectedKind === 'image') {
+      const qualityVal = useCustomQuality
+        ? Number(getElement('custom-quality').value) / 100
+        : null;
+      const resizeEnabled = getElement('enable-resize').checked;
+      const maxDim = resizeEnabled
+        ? Number(getElement('max-dimension').value)
+        : null;
+
+      result = await compressImage(selectedFile, selectedFileBytes, {
+        mode,
+        customQuality: qualityVal,
+        targetSizeBytes: getTargetSizeBytes(),
+        maxDimension: Number.isFinite(maxDim) && maxDim >= 64 ? maxDim : null,
+        onProgress,
+        signal,
+      });
+    } else {
+      result = await compressPdf(selectedFileBytes, mode, {
+        onProgress,
+        signal,
+      });
+    }
 
     if (operationId !== activeOperationId) {
       return;
@@ -389,9 +650,13 @@ async function startCompression() {
     setPressPosition(1);
     updateProgress(100, false);
 
+    const minSettle =
+      selectedKind === 'image'
+        ? IMAGE_LIMITS.minSettlingDurationMs
+        : PDF_LIMITS.minSettlingDurationMs;
     const remainingSettlingMs = prefersReducedMotion
       ? 0
-      : Math.max(0, PDF_LIMITS.minSettlingDurationMs - result.durationMs);
+      : Math.max(0, minSettle - result.durationMs);
     await waitForSettling(remainingSettlingMs, signal);
 
     if (operationId !== activeOperationId) {
@@ -404,7 +669,6 @@ async function startCompression() {
       : 'NO FURTHER REDUCTION';
     renderResultMetrics(result);
     setCompressionUiState(false);
-    startButton.firstElementChild.textContent = 'Compress PDF';
   } catch (error) {
     if (error?.name === 'AbortError' || operationId !== activeOperationId) {
       resetPressState();
@@ -412,7 +676,7 @@ async function startCompression() {
     }
 
     resetPressState();
-    showError(error?.message || 'PDF compression failed.');
+    showError(error?.message || 'Compression failed.');
   }
 }
 
@@ -425,13 +689,23 @@ function handleDownload() {
   downloadButton.disabled = true;
 
   try {
-    const blob = createPdfBlob(compressionResult.bytes);
+    const mimeType =
+      compressionResult.kind === 'image'
+        ? compressionResult.mimeType
+        : 'application/pdf';
+    const blob = createFileBlob(compressionResult.bytes, mimeType);
     const filename = compressionResult.wasReduced
-      ? buildCompressedFilename(selectedFile.name)
+      ? compressionResult.kind === 'image'
+        ? buildCompressedImageFilename(
+            selectedFile.name,
+            compressionResult.extension
+          )
+        : buildCompressedFilename(selectedFile.name)
       : selectedFile.name;
-    triggerPdfDownload(blob, filename);
+
+    triggerFileDownload(blob, filename);
   } catch (error) {
-    showError(error?.message || 'Unable to download compressed PDF.');
+    showError(error?.message || 'Unable to download compressed file.');
   } finally {
     setTimeout(() => {
       downloadButton.disabled = false;
@@ -486,7 +760,7 @@ getElement('sample').onclick = () => {
 getElement('cancel').onclick = () => {
   cancelActiveOperation();
   resetPressState();
-  if (selectedFile && selectedPageCount > 0) {
+  if (selectedFile && (selectedPageCount > 0 || selectedImageInfo)) {
     getElement('status').textContent = 'COMPRESSION CANCELLED';
   }
 };
@@ -495,13 +769,25 @@ getElement('reset').onclick = resetWorkspace;
 
 document.querySelectorAll('[name=mode]').forEach((input) => {
   input.onchange = () => {
-    const preset = COMPRESSION_PRESETS[input.value];
-    if (preset) {
-      getElement('quality').textContent = preset.description;
-      updateWarnings();
-    }
+    useCustomQuality = false;
+    syncImageOptionsVisibility();
+    updatePresetDescription();
+    updateWarnings();
   };
 });
+
+getElement('custom-quality').oninput = (event) => {
+  useCustomQuality = true;
+  getElement('custom-quality-value').textContent = `${event.target.value}%`;
+};
+
+getElement('target-size').onchange = (event) => {
+  getElement('custom-target-row').hidden = event.target.value !== 'custom';
+};
+
+getElement('enable-resize').onchange = (event) => {
+  getElement('max-dimension').disabled = !event.target.checked;
+};
 
 getElement('start').onclick = startCompression;
 getElement('download').onclick = handleDownload;
@@ -509,16 +795,15 @@ getElement('download').onclick = handleDownload;
 getElement('about').onclick = () => {
   openDialog(
     'Less space. More room.',
-    'A local-first PDF compression utility. All PDF parsing, rendering, ' +
-      'and compression run directly in your browser. Files are never uploaded.'
+    'A local-first PDF and image compression utility. All parsing, ' +
+      'rendering, and compression run directly in your browser. Files are never uploaded.'
   );
 };
 
 window.addEventListener('pagehide', () => {
   cancelActiveOperation();
-  if (previewObjectUrl) {
-    URL.revokeObjectURL(previewObjectUrl);
-  }
+  clearImagePreview();
 });
 
+updatePresetDescription();
 updateWarnings();

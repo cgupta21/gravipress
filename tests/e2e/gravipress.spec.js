@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+﻿import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { PDFDocument } from 'pdf-lib';
@@ -148,16 +148,16 @@ test('UI workflows, previews, warnings, cancellation, reset, errors, and screens
 
   // Test Reset
   await page.locator('#reset').click();
-  await expect(page.locator('#filename')).toHaveText('Awaiting PDF');
+  await expect(page.locator('#filename')).toHaveText('Awaiting file');
   await expect(page.locator('#image-preview')).toBeHidden();
 
-  // Test error states: empty, renamed non-PDF, corrupted, encrypted, unsupported JPG
+  // Test error states: empty, renamed non-PDF, corrupted, encrypted, unsupported MP4
   for (const invalidPath of [
     fixtures.empty,
     fixtures.renamedNonPdf,
     fixtures.corrupted,
     fixtures.encrypted,
-    fixtures.unsupportedJpg,
+    fixtures.unsupportedMp4,
   ]) {
     await page.locator('#file').setInputFiles(invalidPath);
     await expect(page.locator('#error')).toBeVisible();
@@ -328,4 +328,425 @@ test('Responsive design across Desktop, Laptop, Tablet, Mobile, and Small Mobile
     expect(layoutCheck.startRect.width).toBeGreaterThan(100);
     expect(layoutCheck.machineRect.width).toBeGreaterThan(150);
   }
+});
+
+test('Phase 3 image compression: PNG, JPEG, WebP, AVIF, EXIF, custom controls, comparison, and benchmarks', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const consoleErrors = [];
+  const externalRequests = [];
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
+  page.on('request', (req) => {
+    const url = req.url();
+    if (
+      !url.startsWith('http://127.0.0.1:4173') &&
+      !url.startsWith('http://localhost:4173') &&
+      !url.startsWith('blob:') &&
+      !url.startsWith('data:')
+    ) {
+      externalRequests.push(url);
+    }
+  });
+
+  await page.goto('/');
+
+  // Generate real JPEG, WebP, and AVIF (if supported) files in-browser
+  const generated = await page.evaluate(async () => {
+    const width = 1200;
+    const height = 800;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, width, height);
+    grad.addColorStop(0, '#2b2d21');
+    grad.addColorStop(0.5, '#ffc93c');
+    grad.addColorStop(1, '#d9dadc');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+    for (let i = 0; i < 400; i += 1) {
+      ctx.fillStyle = `rgb(${(i * 37) % 255}, ${(i * 73) % 255}, ${(i * 19) % 255})`;
+      ctx.fillRect((i * 53) % width, (i * 29) % height, 40, 40);
+    }
+
+    async function encode(mime, quality) {
+      const blob = await new Promise((res) =>
+        canvas.toBlob(res, mime, quality)
+      );
+      if (!blob || blob.type !== mime) {
+        return null;
+      }
+      return Array.from(new Uint8Array(await blob.arrayBuffer()));
+    }
+
+    return {
+      jpeg: await encode('image/jpeg', 0.96),
+      webp: await encode('image/webp', 0.96),
+      avif: await encode('image/avif', 0.95),
+    };
+  });
+
+  const jpegPath = path.join(FIXTURES_DIR, 'photo-highres.jpg');
+  const webpPath = path.join(FIXTURES_DIR, 'photo-highres.webp');
+  fs.writeFileSync(jpegPath, Buffer.from(generated.jpeg));
+  fs.writeFileSync(webpPath, Buffer.from(generated.webp));
+
+  const imageFixtures = [
+    ['transparent-graphic.png', fixtures.transparentPng],
+    ['noisy-photo.png', fixtures.noisyPng],
+    ['large-image-10mb.png', fixtures.largeImage10Mb],
+    ['tiny-optimized.png', fixtures.tinyPng],
+    ['photo-highres.jpg', jpegPath],
+    ['photo-highres.webp', webpPath],
+  ];
+
+  if (generated.avif) {
+    const avifPath = path.join(FIXTURES_DIR, 'photo-highres.avif');
+    fs.writeFileSync(avifPath, Buffer.from(generated.avif));
+    imageFixtures.push(['photo-highres.avif', avifPath]);
+  }
+
+  const imageResults = [];
+
+  for (const [name, filePath] of imageFixtures) {
+    const origBytes = fs.readFileSync(filePath);
+    for (const mode of ['Light', 'Balanced', 'Maximum']) {
+      await uploadPdfAndWaitPreview(page, filePath);
+      await expect(page.locator('#image-options')).toBeVisible();
+
+      if (name === 'transparent-graphic.png' && mode === 'Balanced') {
+        await page.screenshot({
+          path: path.join(SCREENSHOTS_DIR, '06-image-selected.png'),
+          fullPage: true,
+        });
+      }
+
+      const outcome = await compressAndCaptureDownload(page, mode);
+      await expect(page.locator('#comparison')).toBeVisible();
+
+      if (name === 'photo-highres.jpg' && mode === 'Balanced') {
+        await page.screenshot({
+          path: path.join(SCREENSHOTS_DIR, '07-image-completed.png'),
+          fullPage: true,
+        });
+      }
+
+      const wasReduced =
+        outcome.downloadedBytes.byteLength < origBytes.byteLength;
+      expect(outcome.downloadedBytes.byteLength).toBeLessThanOrEqual(
+        origBytes.byteLength
+      );
+
+      const ext = name.split('.').pop();
+      const expectedName = wasReduced
+        ? name.replace(/\.[^.]+$/, `-compressed.${ext}`)
+        : name;
+      expect(outcome.suggestedFilename).toBe(expectedName);
+
+      const pct = (
+        ((origBytes.byteLength - outcome.downloadedBytes.byteLength) /
+          origBytes.byteLength) *
+        100
+      ).toFixed(1);
+
+      imageResults.push({
+        fixture: name,
+        mode,
+        originalBytes: origBytes.byteLength,
+        compressedBytes: outcome.downloadedBytes.byteLength,
+        reductionPct: `${pct}%`,
+        dimensions: outcome.metrics[3],
+        duration: outcome.metrics[4],
+        method: outcome.metrics[5],
+      });
+    }
+  }
+
+  // Test custom target size (50 KB) + optional dimension reduction (400px) on JPEG
+  await uploadPdfAndWaitPreview(page, jpegPath);
+  await page.locator('#target-size').selectOption('50');
+  await page.locator('#enable-resize').check();
+  await page.locator('#max-dimension').fill('400');
+  const targeted = await compressAndCaptureDownload(page, 'Balanced');
+  expect(targeted.downloadedBytes.byteLength).toBeLessThanOrEqual(50 * 1024);
+  expect(targeted.metrics[3]).toContain('400\u00d7267');
+
+  // Test animated PNG, corrupted PNG, and renamed JPEG rejection
+  for (const badPath of [
+    fixtures.animatedPng,
+    fixtures.corruptedPng,
+    fixtures.renamedImage,
+  ]) {
+    await page.locator('#file').setInputFiles(badPath);
+    await expect(page.locator('#error')).toBeVisible();
+    await expect(page.locator('#download')).toBeHidden();
+  }
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, '08-image-error.png'),
+    fullPage: true,
+  });
+
+  expect(externalRequests).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+  console.log('\nIMAGE_BENCHMARK_RESULTS_JSON=' + JSON.stringify(imageResults));
+});
+
+test('EXIF orientations 1-8 and JPEG PSNR visual quality verification', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  // Create an asymmetric 120x80 JPEG and test all 8 EXIF orientation values
+  const exifResults = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 120;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#2b2d21';
+    ctx.fillRect(0, 0, 120, 80);
+    ctx.fillStyle = '#ffc93c';
+    ctx.fillRect(0, 0, 30, 20);
+    const blob = await new Promise((res) =>
+      canvas.toBlob(res, 'image/jpeg', 0.95)
+    );
+    const baseJpeg = new Uint8Array(await blob.arrayBuffer());
+
+    function injectExifOrientation(jpegBytes, orientation) {
+      // Minimal TIFF/EXIF APP1 segment (little-endian) with Orientation tag 0x0112
+      const app1 = new Uint8Array([
+        0xff,
+        0xe1,
+        0x00,
+        0x22,
+        0x45,
+        0x78,
+        0x69,
+        0x66,
+        0x00,
+        0x00, // "Exif\0\0"
+        0x49,
+        0x49,
+        0x2a,
+        0x00,
+        0x08,
+        0x00,
+        0x00,
+        0x00, // TIFF II*
+        0x01,
+        0x00, // 1 IFD entry
+        0x12,
+        0x01,
+        0x03,
+        0x00,
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        orientation & 0xff,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+      ]);
+      const out = new Uint8Array(jpegBytes.length + app1.length);
+      out.set(jpegBytes.subarray(0, 2), 0);
+      out.set(app1, 2);
+      out.set(jpegBytes.subarray(2), 2 + app1.length);
+      return out;
+    }
+
+    const dimsByOrientation = [];
+    for (let orientation = 1; orientation <= 8; orientation += 1) {
+      const oriented = injectExifOrientation(baseJpeg, orientation);
+      const bmp = await createImageBitmap(
+        new Blob([oriented], { type: 'image/jpeg' }),
+        { imageOrientation: 'from-image' }
+      );
+      dimsByOrientation.push({
+        orientation,
+        width: bmp.width,
+        height: bmp.height,
+      });
+      bmp.close();
+    }
+
+    // Compute PSNR between original 120x80 and 78% Balanced JPEG
+    const outBlob = await new Promise((res) =>
+      canvas.toBlob(res, 'image/jpeg', 0.78)
+    );
+    const origBmp = await createImageBitmap(blob);
+    const compBmp = await createImageBitmap(outBlob);
+    const c1 = document.createElement('canvas');
+    const c2 = document.createElement('canvas');
+    c1.width = c2.width = 120;
+    c1.height = c2.height = 80;
+    const g1 = c1.getContext('2d');
+    const g2 = c2.getContext('2d');
+    g1.drawImage(origBmp, 0, 0);
+    g2.drawImage(compBmp, 0, 0);
+    const d1 = g1.getImageData(0, 0, 120, 80).data;
+    const d2 = g2.getImageData(0, 0, 120, 80).data;
+    origBmp.close();
+    compBmp.close();
+
+    let mse = 0;
+    const channels = 120 * 80 * 3;
+    for (let i = 0; i < d1.length; i += 4) {
+      mse += (d1[i] - d2[i]) ** 2;
+      mse += (d1[i + 1] - d2[i + 1]) ** 2;
+      mse += (d1[i + 2] - d2[i + 2]) ** 2;
+    }
+    mse /= channels;
+    const psnr = mse === 0 ? 99 : 10 * Math.log10((255 * 255) / mse);
+
+    return { dimsByOrientation, psnr };
+  });
+
+  for (const item of exifResults.dimsByOrientation) {
+    if (item.orientation >= 5) {
+      expect(item.width).toBe(80);
+      expect(item.height).toBe(120);
+    } else {
+      expect(item.width).toBe(120);
+      expect(item.height).toBe(80);
+    }
+  }
+  expect(exifResults.psnr).toBeGreaterThanOrEqual(28);
+  console.log(`\nBALANCED_JPEG_PSNR=${exifResults.psnr.toFixed(2)} dB`);
+});
+
+test('EXIF orientations 1-8 and JPEG PSNR visual quality verification', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  // Create an asymmetric 120x80 JPEG and test all 8 EXIF orientation values
+  const exifResults = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 120;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#2b2d21';
+    ctx.fillRect(0, 0, 120, 80);
+    ctx.fillStyle = '#ffc93c';
+    ctx.fillRect(0, 0, 30, 20);
+    const blob = await new Promise((res) =>
+      canvas.toBlob(res, 'image/jpeg', 0.95)
+    );
+    const baseJpeg = new Uint8Array(await blob.arrayBuffer());
+
+    function injectExifOrientation(jpegBytes, orientation) {
+      // Minimal TIFF/EXIF APP1 segment (little-endian) with Orientation tag 0x0112
+      const app1 = new Uint8Array([
+        0xff,
+        0xe1,
+        0x00,
+        0x22,
+        0x45,
+        0x78,
+        0x69,
+        0x66,
+        0x00,
+        0x00, // "Exif\0\0"
+        0x49,
+        0x49,
+        0x2a,
+        0x00,
+        0x08,
+        0x00,
+        0x00,
+        0x00, // TIFF II*
+        0x01,
+        0x00, // 1 IFD entry
+        0x12,
+        0x01,
+        0x03,
+        0x00,
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        orientation & 0xff,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+      ]);
+      const out = new Uint8Array(jpegBytes.length + app1.length);
+      out.set(jpegBytes.subarray(0, 2), 0);
+      out.set(app1, 2);
+      out.set(jpegBytes.subarray(2), 2 + app1.length);
+      return out;
+    }
+
+    const dimsByOrientation = [];
+    for (let orientation = 1; orientation <= 8; orientation += 1) {
+      const oriented = injectExifOrientation(baseJpeg, orientation);
+      const bmp = await createImageBitmap(
+        new Blob([oriented], { type: 'image/jpeg' }),
+        { imageOrientation: 'from-image' }
+      );
+      dimsByOrientation.push({
+        orientation,
+        width: bmp.width,
+        height: bmp.height,
+      });
+      bmp.close();
+    }
+
+    // Compute PSNR between original 120x80 and 78% Balanced JPEG
+    const outBlob = await new Promise((res) =>
+      canvas.toBlob(res, 'image/jpeg', 0.78)
+    );
+    const origBmp = await createImageBitmap(blob);
+    const compBmp = await createImageBitmap(outBlob);
+    const c1 = document.createElement('canvas');
+    const c2 = document.createElement('canvas');
+    c1.width = c2.width = 120;
+    c1.height = c2.height = 80;
+    const g1 = c1.getContext('2d');
+    const g2 = c2.getContext('2d');
+    g1.drawImage(origBmp, 0, 0);
+    g2.drawImage(compBmp, 0, 0);
+    const d1 = g1.getImageData(0, 0, 120, 80).data;
+    const d2 = g2.getImageData(0, 0, 120, 80).data;
+    origBmp.close();
+    compBmp.close();
+
+    let mse = 0;
+    const channels = 120 * 80 * 3;
+    for (let i = 0; i < d1.length; i += 4) {
+      mse += (d1[i] - d2[i]) ** 2;
+      mse += (d1[i + 1] - d2[i + 1]) ** 2;
+      mse += (d1[i + 2] - d2[i + 2]) ** 2;
+    }
+    mse /= channels;
+    const psnr = mse === 0 ? 99 : 10 * Math.log10((255 * 255) / mse);
+
+    return { dimsByOrientation, psnr };
+  });
+
+  for (const item of exifResults.dimsByOrientation) {
+    if (item.orientation >= 5) {
+      expect(item.width).toBe(80);
+      expect(item.height).toBe(120);
+    } else {
+      expect(item.width).toBe(120);
+      expect(item.height).toBe(80);
+    }
+  }
+  expect(exifResults.psnr).toBeGreaterThanOrEqual(28);
+  console.log(`\nBALANCED_JPEG_PSNR=${exifResults.psnr.toFixed(2)} dB`);
 });

@@ -46,7 +46,7 @@
       </a>
       <div class="nav-right">
         <button class="link" id="about">About</button>
-        <span class="version">V.02</span>
+        <span class="version">V.03</span>
       </div>
     </header>
 
@@ -58,7 +58,7 @@
         </div>
         <p class="intro">
           A little pressure goes a long way.<br />
-          Shrink your PDFs, without sending them anywhere.<br />
+          Shrink your PDFs and images, without sending them anywhere.<br />
           <span>DESIGNED FOR LOCAL PROCESSING.</span>
         </p>
       </section>
@@ -74,7 +74,7 @@
             type="file"
             id="file"
             hidden
-            accept=".pdf,application/pdf,.jpg,.jpeg,.png,.webp,.mp4,.mp3,.zip"
+            accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.avif,image/avif,.mp4,.mp3,.zip"
           />
 
           <button class="drop" id="drop" type="button">
@@ -88,18 +88,25 @@
             >
               <path d="M12 16V3m-5 5 5-5 5 5M3 16v5h18v-5" />
             </svg>
-            <strong id="filelabel">Drop your PDF here</strong>
+            <strong id="filelabel">Drop your PDF or image here</strong>
             <span id="filesub">or click to browse your device</span>
           </button>
 
           <div class="types">
             <span class="supported">PDF</span>
-            <span class="soon" title="Not yet supported in Phase 2">JPG</span>
-            <span class="soon" title="Not yet supported in Phase 2">PNG</span>
-            <span class="soon" title="Not yet supported in Phase 2">WEBP</span>
-            <span class="soon" title="Not yet supported in Phase 2">MP4</span>
-            <span class="soon" title="Not yet supported in Phase 2">MP3</span>
-            <span class="soon" title="Not yet supported in Phase 2">ZIP</span>
+            <span class="supported">JPG</span>
+            <span class="supported">PNG</span>
+            <span class="supported">WEBP</span>
+            <span class="supported">AVIF</span>
+            <span class="soon" title="Video compression is not yet supported"
+              >MP4</span
+            >
+            <span class="soon" title="Audio compression is not yet supported"
+              >MP3</span
+            >
+            <span class="soon" title="Archive compression is not yet supported"
+              >ZIP</span
+            >
           </div>
 
           <fieldset>
@@ -127,8 +134,75 @@
 
           <p class="warning" id="warning" role="status" hidden></p>
 
+          <div class="image-options" id="image-options" hidden>
+            <div class="option-row" id="quality-row">
+              <label for="custom-quality">
+                Quality: <strong id="custom-quality-value">78%</strong>
+              </label>
+              <input
+                type="range"
+                id="custom-quality"
+                min="10"
+                max="100"
+                step="1"
+                value="78"
+              />
+            </div>
+
+            <div class="option-row">
+              <label for="target-size">Target file size</label>
+              <select id="target-size">
+                <option value="">None (preset / quality)</option>
+                <option value="50">50 KB</option>
+                <option value="100">100 KB</option>
+                <option value="200">200 KB</option>
+                <option value="500">500 KB</option>
+                <option value="1024">1 MB</option>
+                <option value="2048">2 MB</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+
+            <div class="option-row custom-target" id="custom-target-row" hidden>
+              <label for="custom-target-value">Custom target</label>
+              <div class="inline-pair">
+                <input
+                  type="number"
+                  id="custom-target-value"
+                  min="1"
+                  max="50000"
+                  value="150"
+                />
+                <select id="custom-target-unit" aria-label="Target size unit">
+                  <option value="KB">KB</option>
+                  <option value="MB">MB</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="option-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="enable-resize" />
+                <span>Limit max dimension (px)</span>
+              </label>
+              <input
+                type="number"
+                id="max-dimension"
+                min="64"
+                max="12000"
+                value="1920"
+                disabled
+                aria-label="Maximum dimension in pixels"
+              />
+            </div>
+
+            <p class="small option-note" id="metadata-note">
+              Re-encoding removes EXIF/IPTC/XMP metadata and normalizes to sRGB.
+            </p>
+          </div>
+
           <button class="action" id="start" type="button">
-            <span>Compress PDF</span>
+            <span>Compress file</span>
             <span aria-hidden="true">↓</span>
           </button>
 
@@ -194,9 +268,19 @@
           <div class="result" id="result" hidden>
             <h2 id="result-title">Press complete.</h2>
             <p id="result-summary"></p>
+            <div class="comparison" id="comparison" hidden>
+              <figure>
+                <img id="compare-before" alt="Original image preview" />
+                <figcaption>Original</figcaption>
+              </figure>
+              <figure>
+                <img id="compare-after" alt="Compressed image preview" />
+                <figcaption id="compare-after-label">Compressed</figcaption>
+              </figure>
+            </div>
             <dl class="metrics" id="metrics"></dl>
             <button class="action" id="download" type="button">
-              Download PDF <span aria-hidden="true">↓</span>
+              Download <span aria-hidden="true">↓</span>
             </button>
           </div>
         </div>
@@ -209,8 +293,8 @@
       </footer>
 
       <p class="notice">
-        Client-side PDF compression — files never leave your browser. Other
-        formats are not yet supported.
+        Client-side PDF &amp; image compression — files never leave your
+        browser. Video, audio, and archives are not yet supported.
       </p>
     </main>
 

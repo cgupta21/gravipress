@@ -272,11 +272,133 @@ export async function ensureTestFixtures(outputDir) {
     files.renamedNonPdf = target;
   }
 
-  // 14. Unsupported format (.jpg)
+  // 14. Unsupported format (.mp4)
   {
-    const target = path.join(outputDir, 'unsupported.jpg');
-    fs.writeFileSync(target, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]));
-    files.unsupportedJpg = target;
+    const target = path.join(outputDir, 'unsupported.mp4');
+    fs.writeFileSync(
+      target,
+      Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70])
+    );
+    files.unsupportedMp4 = target;
+  }
+
+  // 15. Transparent PNG (flat graphic + alpha)
+  {
+    const width = 400;
+    const height = 300;
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 6; // RGBA
+    const stride = width * 4 + 1;
+    const raw = Buffer.alloc(stride * height);
+    for (let y = 0; y < height; y += 1) {
+      raw[y * stride] = 0;
+      for (let x = 0; x < width; x += 1) {
+        const idx = y * stride + 1 + x * 4;
+        const inBox = x > 80 && x < 320 && y > 60 && y < 240;
+        raw[idx] = inBox ? 255 : 0;
+        raw[idx + 1] = inBox ? 201 : 0;
+        raw[idx + 2] = inBox ? 60 : 0;
+        raw[idx + 3] = inBox ? 255 : 0;
+      }
+    }
+    const pngBuf = Buffer.concat([
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      makePngChunk('IHDR', ihdr),
+      makePngChunk('IDAT', zlib.deflateSync(raw, { level: 0 })),
+      makePngChunk('IEND', Buffer.alloc(0)),
+    ]);
+    const target = path.join(outputDir, 'transparent-graphic.png');
+    fs.writeFileSync(target, pngBuf);
+    files.transparentPng = target;
+  }
+
+  // 16. Noisy high-res PNG (for Balanced/Maximum PNG & photo conversion)
+  {
+    const target = path.join(outputDir, 'noisy-photo.png');
+    fs.writeFileSync(target, createSyntheticPng(900, 700, 88));
+    files.noisyPng = target;
+  }
+
+  // 17. Already-optimized tiny 1x1 PNG
+  {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(1, 0);
+    ihdr.writeUInt32BE(1, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2;
+    const tiny = Buffer.concat([
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      makePngChunk('IHDR', ihdr),
+      makePngChunk(
+        'IDAT',
+        zlib.deflateSync(Buffer.from([0, 43, 45, 33]), { level: 9 })
+      ),
+      makePngChunk('IEND', Buffer.alloc(0)),
+    ]);
+    const target = path.join(outputDir, 'tiny-optimized.png');
+    fs.writeFileSync(target, tiny);
+    files.tinyPng = target;
+  }
+
+  // 18. Animated PNG (APNG)
+  {
+    const base = createSyntheticPng(64, 64, 5);
+    const actl = makePngChunk('acTL', Buffer.from([0, 0, 0, 2, 0, 0, 0, 0]));
+    const apng = Buffer.concat([base.subarray(0, 33), actl, base.subarray(33)]);
+    const target = path.join(outputDir, 'animated.png');
+    fs.writeFileSync(target, apng);
+    files.animatedPng = target;
+  }
+
+  // 19. Corrupted PNG & renamed text as .jpg
+  {
+    const corruptImg = path.join(outputDir, 'corrupted-image.png');
+    fs.writeFileSync(
+      corruptImg,
+      Buffer.from([
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0,
+        10, 0, 0, 0, 10, 8, 2, 0, 0, 0, 0,
+      ])
+    );
+    files.corruptedPng = corruptImg;
+
+    const renamedImg = path.join(outputDir, 'renamed-image.jpg');
+    fs.writeFileSync(renamedImg, 'Not a real JPEG file');
+    files.renamedImage = renamedImg;
+  }
+
+  // 20. Large 5-25 MB PNG (~8 MB uncompressed level-0 PNG, 2200x1600)
+  {
+    const width = 2200;
+    const height = 1600;
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2; // RGB
+    const stride = width * 3 + 1;
+    const raw = Buffer.alloc(stride * height);
+    for (let y = 0; y < height; y += 1) {
+      raw[y * stride] = 0;
+      for (let x = 0; x < width; x += 1) {
+        const idx = y * stride + 1 + x * 3;
+        raw[idx] = (x * 3 + y) & 0xff;
+        raw[idx + 1] = (y * 5 + x) & 0xff;
+        raw[idx + 2] = ((x ^ y) * 2) & 0xff;
+      }
+    }
+    const bigPng = Buffer.concat([
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      makePngChunk('IHDR', ihdr),
+      makePngChunk('IDAT', zlib.deflateSync(raw, { level: 0 })),
+      makePngChunk('IEND', Buffer.alloc(0)),
+    ]);
+    const target = path.join(outputDir, 'large-image-10mb.png');
+    fs.writeFileSync(target, bigPng);
+    files.largeImage10Mb = target;
   }
 
   return files;
