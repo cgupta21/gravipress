@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2b2d21" />
+    <title>Gravipress — Engineered to be smaller.</title>
+    <meta
+      name="description"
+      content="Gravipress is a local-first file compression utility. Preview the industrial compression workspace."
+    />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Gravipress — Engineered to be smaller."
+    />
+    <meta
+      property="og:description"
+      content="A local-first file compression workspace."
+    />
+    <meta property="og:image" content="/social-preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/social-preview.png" />
+
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+
+  <body>
+    <header class="shell nav">
+      <a class="brand" href="./">
+        <img
+          class="brand-logo"
+          src="/brand/logo-horizontal-light.png"
+          alt="Gravipress"
+          width="250"
+          height="44"
+        />
+      </a>
+      <div class="nav-right">
+        <button class="link" id="about">About</button>
+        <span class="version">V.01</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow"><i></i> THE FILE COMPRESSION UTILITY</p>
+          <h1>Less space.<br /><em>More room.</em></h1>
+        </div>
+        <p class="intro">
+          A little pressure goes a long way.<br />
+          Shrink your files, without sending them anywhere.<br />
+          <span>DESIGNED FOR LOCAL PROCESSING.</span>
+        </p>
+      </section>
+
+      <section class="workspace" aria-label="Compression workspace">
+        <div class="controls">
+          <div class="micro">
+            <span>01 / YOUR FILE</span>
+            <span>INPUT</span>
+          </div>
+
+          <input
+            type="file"
+            id="file"
+            hidden
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.mp3,.zip"
+          />
+
+          <button class="drop" id="drop">
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+            >
+              <path d="M12 16V3m-5 5 5-5 5 5M3 16v5h18v-5" />
+            </svg>
+            <strong id="filelabel">Drop your file here</strong>
+            <span id="filesub">or click to browse your device</span>
+          </button>
+
+          <div class="types">
+            <span>PDF</span>
+            <span>JPG</span>
+            <span>PNG</span>
+            <span>WEBP</span>
+            <span>MP4</span>
+            <span>MP3</span>
+            <span>ZIP</span>
+          </div>
+
+          <fieldset>
+            <legend>How much pressure?</legend>
+            <div class="presets">
+              <label>
+                <input type="radio" name="mode" value="Light" />
+                <span>Light</span>
+              </label>
+              <label>
+                <input type="radio" name="mode" value="Balanced" checked />
+                <span>Balanced</span>
+              </label>
+              <label>
+                <input type="radio" name="mode" value="Maximum" />
+                <span>Maximum</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <p class="small" id="quality">
+            A balance between quality and file size.
+          </p>
+
+          <button class="action" id="start">
+            <span>Compress file</span>
+            <span aria-hidden="true">↓</span>
+          </button>
+
+          <div class="minor">
+            <button class="link" id="sample">Try sample file</button>
+            <button class="link" id="reset">Reset workspace</button>
+          </div>
+
+          <p id="error" role="alert" hidden></p>
+        </div>
+
+        <div class="machine-area">
+          <div class="micro">
+            <span>02 / PRESS UNIT</span>
+            <span>GP–01</span>
+          </div>
+
+          <div class="machine" id="machine" aria-hidden="true">
+            <div class="rail left"></div>
+            <div class="rail right"></div>
+            <div class="beam top"><i></i><i></i></div>
+            <div class="cylinder"></div>
+            <div class="rod"></div>
+            <div class="plate"></div>
+            <div class="paper" id="paper">
+              <div class="document">
+                <b id="paperhead">DOCUMENT 001</b>
+                <div class="doclines"></div>
+                <div class="docgrid"></div>
+                <div class="doclines short"></div>
+              </div>
+              <img id="image-preview" alt="" hidden />
+            </div>
+            <div class="beam bottom"><i></i><i></i></div>
+          </div>
+
+          <div class="status" role="status">
+            <i></i>
+            <span id="status">SYSTEM READY</span>
+          </div>
+          <div class="filename" id="filename">Awaiting file</div>
+
+          <div
+            class="progress"
+            id="progress"
+            role="progressbar"
+            aria-label="Demo animation progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          >
+            <div></div>
+          </div>
+
+          <div class="result" id="result" hidden>
+            <h2>Press complete.</h2>
+            <p>Animation preview finished. No file was compressed.</p>
+            <button class="action" id="download">
+              Download <span>↓</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span>01 / PRIVATE BY DESIGN</span>
+        <span>02 / NO ACCOUNT</span>
+        <span>03 / LOCAL-FIRST</span>
+      </footer>
+
+      <p class="notice">
+        UI prototype — real compression and downloads are not connected.
+      </p>
+    </main>
+
+    <div class="hazard"></div>
+
+    <dialog id="dialog">
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-text"></p>
+      <form method="dialog">
+        <button class="action">Close <span>×</span></button>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "Gravipress",
+  "short_name": "Gravipress",
+  "description": "Local-first file compression utility \u2014 UI prototype",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#d9dadc",
+  "theme_color": "#2b2d21",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

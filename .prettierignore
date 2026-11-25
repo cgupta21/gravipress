@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+public/brand/
+public/*.svg
+public/*.png
+public/*.ico

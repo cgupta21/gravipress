@@ -1,0 +1,699 @@
+/* ==========================================================================
+   Theme & Base Reset
+   ========================================================================== */
+
+:root {
+  --olive: #2b2d21;
+  --grey: #d9dadc;
+  --yellow: #ffc93c;
+  --white: #f5f5f0;
+  --muted: #74776b;
+  --dark: #1c1e17;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--olive);
+  background: var(--grey);
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible + span {
+  outline: 3px solid #897000;
+  outline-offset: 4px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.shell {
+  width: min(1120px, 90%);
+  margin-inline: auto;
+}
+
+/* ==========================================================================
+   Navigation & Brand
+   ========================================================================== */
+
+.nav {
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2b2d2140;
+}
+
+.brand {
+  font-size: 29px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.mark {
+  background: var(--olive);
+  color: var(--yellow);
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  font-size: 19px;
+  letter-spacing: -4px;
+  padding-right: 4px;
+  border-radius: 4px;
+}
+
+.nav-right {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.version,
+.types span {
+  font: 11px monospace;
+  border: 1px solid #2b2d2140;
+  padding: 5px 8px;
+}
+
+.brand-logo {
+  display: block;
+  width: clamp(160px, 25vw, 250px);
+  height: auto;
+  max-width: 100%;
+}
+
+/* ==========================================================================
+   Hero Section
+   ========================================================================== */
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 30px;
+  padding: 42px 0 34px;
+}
+
+.eyebrow,
+.micro,
+.status,
+footer {
+  font: 11px monospace;
+  letter-spacing: 1.3px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eyebrow i,
+.status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.hero h1 {
+  font-size: clamp(52px, 8.5vw, 108px);
+  letter-spacing: -0.075em;
+  line-height: 0.9;
+  margin: 22px 0 0;
+}
+
+.hero em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.07em;
+}
+
+.intro {
+  font-size: 14px;
+  line-height: 1.8;
+  max-width: 300px;
+  margin: 0 0 5px;
+  color: #515448;
+}
+
+.intro span {
+  display: block;
+  font: 10px monospace;
+  letter-spacing: 0.8px;
+  margin-top: 20px;
+}
+
+/* ==========================================================================
+   Workspace & Controls
+   ========================================================================== */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--olive);
+  background: var(--white);
+}
+
+.controls,
+.machine-area {
+  padding: clamp(22px, 3.5vw, 42px);
+  min-width: 0;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.micro {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.drop {
+  min-height: 168px;
+  border: 1px dashed #979a8d;
+  background: #eeeee8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 12px;
+}
+
+.drop:hover,
+.drop.drag {
+  background: #ffc93c35;
+  border-color: var(--olive);
+}
+
+.drop strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.drop span,
+.small {
+  font-size: 12px;
+  color: #55594c;
+  line-height: 1.6;
+}
+
+.types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+fieldset {
+  border: 0;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+legend {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.presets {
+  display: flex;
+  border: 1px solid var(--olive);
+}
+
+.presets label {
+  flex: 1;
+  position: relative;
+  cursor: pointer;
+}
+
+.presets label + label {
+  border-left: 1px solid var(--olive);
+}
+
+.presets input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.presets span {
+  display: block;
+  text-align: center;
+  padding: 13px 5px;
+  font-size: 13px;
+}
+
+.presets input:checked + span {
+  background: var(--olive);
+  color: var(--yellow);
+}
+
+.small {
+  margin: 0;
+  min-height: 20px;
+}
+
+.action {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--yellow);
+  border: 1px solid var(--olive);
+  padding: 16px 18px;
+  font-weight: 700;
+  font-size: 15px;
+  gap: 8px;
+}
+
+.action:hover {
+  background: #ffda72;
+}
+
+.action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.action span:last-child {
+  font-size: 20px;
+}
+
+.minor {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#error {
+  font-size: 12px;
+  color: #a02a20;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Hydraulic Press Machine & Animation
+   ========================================================================== */
+
+.machine-area {
+  background: var(--olive);
+  color: var(--grey);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+.machine-area .micro {
+  color: #b4b7aa;
+}
+
+.machine {
+  position: relative;
+  width: 220px;
+  height: 290px;
+  margin: 26px auto 20px;
+  --travel: 143px;
+  --duration: 1800ms;
+}
+
+.rail {
+  position: absolute;
+  width: 13px;
+  top: 0;
+  bottom: 0;
+  background: #838679;
+  border: 1px solid #b2b4a7;
+  z-index: 4;
+  border-radius: 2px;
+}
+
+.rail.left {
+  left: 0;
+}
+
+.rail.right {
+  right: 0;
+}
+
+.beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 23px;
+  background: #b7b9b0;
+  border: 1px solid #dadcd3;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 7px;
+  border-radius: 2px;
+}
+
+.beam.top {
+  top: 0;
+}
+
+.beam.bottom {
+  bottom: 0;
+  height: 26px;
+}
+
+.beam i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #74776b;
+  border: 1px solid #52564a;
+}
+
+.cylinder {
+  position: absolute;
+  top: 22px;
+  width: 48px;
+  height: 45px;
+  left: 86px;
+  background: #606355;
+  border: 1px solid #96998b;
+  z-index: 3;
+}
+
+.rod {
+  position: absolute;
+  left: 98px;
+  top: 23px;
+  width: 24px;
+  height: 65px;
+  background: #b4b7ac;
+  z-index: 2;
+}
+
+.plate {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 82px;
+  height: 17px;
+  background: var(--yellow);
+  border: 1px solid #e1b12f;
+  box-shadow: 0 4px 0 #a78024;
+  z-index: 6;
+}
+
+.paper {
+  position: absolute;
+  bottom: 29px;
+  left: 44px;
+  right: 44px;
+  height: 155px;
+  background: #f8f8f1;
+  box-shadow:
+    2px 2px 0 #b0b1a6,
+    4px 4px 0 #85877b;
+  color: var(--olive);
+  transform-origin: bottom;
+  overflow: hidden;
+}
+
+.document {
+  padding: 12px;
+}
+
+.document b {
+  font-size: 10px;
+  display: block;
+  border-bottom: 2px solid;
+  padding-bottom: 7px;
+}
+
+.doclines {
+  height: 38px;
+  margin-top: 9px;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 6px,
+    #c2c5b9 6px 8px
+  );
+}
+
+.docgrid {
+  height: 31px;
+  margin-top: 12px;
+  border: 1px solid #babdb1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 7px,
+    #babdb1 7px 8px
+  );
+}
+
+.doclines.short {
+  height: 20px;
+  width: 78%;
+}
+
+.paper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.machine.pressed .plate {
+  animation: plate var(--duration) ease-in-out forwards;
+}
+
+.machine.pressed .rod {
+  animation: rod var(--duration) ease-in-out forwards;
+}
+
+.machine.pressed .paper {
+  animation: paper var(--duration) ease-in-out forwards;
+}
+
+@keyframes plate {
+  to {
+    transform: translateY(var(--travel));
+  }
+}
+
+@keyframes rod {
+  to {
+    height: calc(65px + var(--travel));
+  }
+}
+
+@keyframes paper {
+  0%,
+  10% {
+    transform: scaleY(1);
+  }
+  100% {
+    transform: scaleY(0.1);
+  }
+}
+
+/* ==========================================================================
+   Status, Progress & Result
+   ========================================================================== */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--yellow);
+  margin: 0 0 9px;
+}
+
+.filename {
+  font-size: 12px;
+  color: #b5b8aa;
+  text-align: center;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.progress {
+  height: 3px;
+  width: 100%;
+  background: #ffffff25;
+  margin-top: 18px;
+}
+
+.progress div {
+  height: 100%;
+  width: 0;
+  background: var(--yellow);
+}
+
+.result {
+  width: 100%;
+  text-align: center;
+  margin-top: 15px;
+}
+
+.result h2 {
+  font-size: 24px;
+  color: var(--yellow);
+  margin: 0;
+}
+
+.result p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.result .action {
+  margin-top: 12px;
+}
+
+/* ==========================================================================
+   Footer, Hazard Stripe & Dialog
+   ========================================================================== */
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid #2b2d2140;
+  margin-top: 26px;
+  padding: 18px 0;
+  font-size: 10px;
+}
+
+.notice {
+  font-size: 11px;
+  color: #55594c;
+  margin: 0 0 24px;
+}
+
+.hazard {
+  height: 7px;
+  margin-top: auto;
+  background: repeating-linear-gradient(
+    125deg,
+    var(--yellow) 0 12px,
+    var(--olive) 12px 24px
+  );
+}
+
+dialog {
+  background: var(--white);
+  color: var(--olive);
+  border: 1px solid var(--olive);
+  padding: 28px;
+  width: min(400px, 90vw);
+}
+
+dialog::backdrop {
+  background: #1c1e1790;
+}
+
+dialog h2 {
+  margin-top: 0;
+  letter-spacing: -1px;
+}
+
+dialog p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ==========================================================================
+   Responsive & Accessibility Media Queries
+   ========================================================================== */
+
+@media (max-width: 680px) {
+  .hero {
+    display: block;
+    padding: 25px 0;
+  }
+
+  .intro {
+    margin-top: 20px;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .machine-area {
+    min-height: 410px;
+  }
+
+  .nav {
+    height: 64px;
+  }
+
+  .hero h1 {
+    font-size: clamp(50px, 11vw, 76px);
+  }
+
+  footer {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nav-right {
+    gap: 10px;
+  }
+
+  .brand-logo {
+    width: 155px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .machine {
+    --duration: 1ms;
+  }
+}
