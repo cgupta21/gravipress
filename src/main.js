@@ -44,6 +44,23 @@ import {
   buildCompressedImageFilename,
   detectImageFormat,
 } from './utils/image-utils.js';
+import {
+  VIDEO_CONTAINER_FORMATS,
+  VIDEO_LIMITS,
+  VIDEO_PRESETS,
+} from './config/video-presets.js';
+import {
+  buildCompressedVideoFilename,
+  detectVideoFormat,
+} from './utils/video-utils.js';
+import {
+  captureVideoPosterFrame,
+  extractVideoMetadata,
+} from './engines/video-metadata.js';
+import {
+  compressVideo,
+  terminateVideoWorker,
+} from './engines/video-compressor.js';
 
 // ============================================================================
 // State
@@ -51,9 +68,10 @@ import {
 
 let selectedFile = null;
 let selectedFileBytes = null;
-let selectedKind = null; // 'pdf' | 'image' | 'batch'
+let selectedKind = null; // 'pdf' | 'image' | 'video' | 'batch' | 'archive'
 let selectedPageCount = 0;
 let selectedImageInfo = null;
+let selectedVideoInfo = null;
 let hasDigitalSignature = false;
 let previewObjectUrl = null;
 let compressedPreviewUrl = null;
@@ -108,7 +126,12 @@ function showError(message) {
 
 function updatePresetDescription() {
   const mode = getSelectedMode();
-  if (selectedKind === 'image') {
+  if (selectedKind === 'video') {
+    const preset = VIDEO_PRESETS[mode];
+    if (preset) {
+      getElement('quality').textContent = preset.description;
+    }
+  } else if (selectedKind === 'image') {
     const preset = IMAGE_PRESETS[mode];
     if (preset) {
       getElement('quality').textContent = preset.description;
@@ -158,20 +181,27 @@ function updateWarnings() {
 
 function syncImageOptionsVisibility() {
   const optionsBox = getElement('image-options');
+  const videoBox = getElement('video-options');
+
   if (batchMode || selectedKind !== 'image') {
     optionsBox.hidden = true;
-    return;
+  } else {
+    optionsBox.hidden = false;
+    const isPng = selectedImageInfo?.format === 'PNG';
+    getElement('quality-row').hidden = isPng;
+
+    if (!useCustomQuality) {
+      const preset = IMAGE_PRESETS[getSelectedMode()];
+      const pct = Math.round((preset?.lossyQuality || 0.78) * 100);
+      getElement('custom-quality').value = String(pct);
+      getElement('custom-quality-value').textContent = `${pct}%`;
+    }
   }
 
-  optionsBox.hidden = false;
-  const isPng = selectedImageInfo?.format === 'PNG';
-  getElement('quality-row').hidden = isPng;
-
-  if (!useCustomQuality) {
-    const preset = IMAGE_PRESETS[getSelectedMode()];
-    const pct = Math.round((preset?.lossyQuality || 0.78) * 100);
-    getElement('custom-quality').value = String(pct);
-    getElement('custom-quality-value').textContent = `${pct}%`;
+  if (batchMode || selectedKind !== 'video') {
+    videoBox.hidden = true;
+  } else {
+    videoBox.hidden = false;
   }
 }
 
@@ -190,6 +220,22 @@ function getTargetSizeBytes() {
     return Math.round(raw * (unit === 'MB' ? 1048576 : 1024));
   }
 
+  const kb = Number(selectValue);
+  return Number.isFinite(kb) && kb > 0 ? kb * 1024 : null;
+}
+
+function getVideoTargetSizeBytes() {
+  const selectValue = getElement('video-target-size')?.value;
+  if (!selectValue) {
+    return null;
+  }
+  if (selectValue === 'custom') {
+    const rawMb = Number(getElement('video-custom-target-val')?.value);
+    if (!Number.isFinite(rawMb) || rawMb <= 0) {
+      return null;
+    }
+    return Math.round(rawMb * 1048576);
+  }
   const kb = Number(selectValue);
   return Number.isFinite(kb) && kb > 0 ? kb * 1024 : null;
 }
@@ -213,11 +259,13 @@ function setCompressionUiState(running) {
       ? 'Create archive'
       : batchMode
         ? 'Compress batch'
-        : selectedKind === 'image'
-          ? 'Compress image'
-          : selectedKind === 'pdf'
-            ? 'Compress PDF'
-            : 'Compress file';
+        : selectedKind === 'video'
+          ? 'Compress video'
+          : selectedKind === 'image'
+            ? 'Compress image'
+            : selectedKind === 'pdf'
+              ? 'Compress PDF'
+              : 'Compress file';
   }
 }
 
@@ -233,6 +281,13 @@ function clearCompressedPreview() {
   getElement('comparison').hidden = true;
   getElement('compare-before').removeAttribute('src');
   getElement('compare-after').removeAttribute('src');
+
+  const videoCompare = getElement('video-comparison');
+  if (videoCompare) {
+    videoCompare.hidden = true;
+    getElement('video-compare-before').removeAttribute('src');
+    getElement('video-compare-after').removeAttribute('src');
+  }
 }
 
 function clearImagePreview() {
@@ -245,6 +300,14 @@ function clearImagePreview() {
   const previewImage = getElement('image-preview');
   previewImage.hidden = true;
   previewImage.removeAttribute('src');
+
+  const previewVideo = getElement('video-preview');
+  if (previewVideo) {
+    previewVideo.hidden = true;
+    previewVideo.pause();
+    previewVideo.removeAttribute('src');
+    previewVideo.load();
+  }
 
   getElement('paper').querySelector('.document').hidden = false;
 }
@@ -274,26 +337,39 @@ function renderResultMetrics(result) {
     : '0 B (0.0%)';
 
   const entries =
-    result.kind === 'image'
+    result.kind === 'video'
       ? [
           ['ORIGINAL', formatFileSize(result.originalSize)],
           ['OUTPUT', formatFileSize(result.compressedSize)],
           ['SAVED', reductionText],
           [
-            'DIMENSIONS',
+            'RESOLUTION',
             `${result.originalWidth}×${result.originalHeight} → ${result.outputWidth}×${result.outputHeight}`,
           ],
           ['DURATION', `${result.durationMs} ms`],
-          ['METHOD', result.methodUsed],
+          ['CONTAINER', result.targetFormat.toUpperCase()],
+          ['AUDIO', result.hasAudio ? 'Preserved' : 'Muted / None'],
         ]
-      : [
-          ['ORIGINAL', formatFileSize(result.originalSize)],
-          ['OUTPUT', formatFileSize(result.compressedSize)],
-          ['SAVED', reductionText],
-          ['DURATION', `${result.durationMs} ms`],
-          ['PAGES', String(result.pageCount)],
-          ['METHOD', result.methodUsed || result.mode],
-        ];
+      : result.kind === 'image'
+        ? [
+            ['ORIGINAL', formatFileSize(result.originalSize)],
+            ['OUTPUT', formatFileSize(result.compressedSize)],
+            ['SAVED', reductionText],
+            [
+              'DIMENSIONS',
+              `${result.originalWidth}×${result.originalHeight} → ${result.outputWidth}×${result.outputHeight}`,
+            ],
+            ['DURATION', `${result.durationMs} ms`],
+            ['METHOD', result.methodUsed],
+          ]
+        : [
+            ['ORIGINAL', formatFileSize(result.originalSize)],
+            ['OUTPUT', formatFileSize(result.compressedSize)],
+            ['SAVED', reductionText],
+            ['DURATION', `${result.durationMs} ms`],
+            ['PAGES', String(result.pageCount)],
+            ['METHOD', result.methodUsed || result.mode],
+          ];
 
   for (const [label, value] of entries) {
     const wrapper = document.createElement('div');
@@ -308,7 +384,12 @@ function renderResultMetrics(result) {
   const titleElement = getElement('result-title');
   const summaryElement = getElement('result-summary');
   const downloadButton = getElement('download');
-  const extLabel = result.kind === 'image' ? result.format : 'PDF';
+  const extLabel =
+    result.kind === 'video'
+      ? result.targetFormat.toUpperCase()
+      : result.kind === 'image'
+        ? result.format
+        : 'PDF';
 
   if (result.wasReduced) {
     titleElement.textContent = 'Press complete.';
@@ -325,7 +406,15 @@ function renderResultMetrics(result) {
     downloadButton.firstChild.textContent = `Download original ${extLabel} `;
   }
 
-  if (result.kind === 'image' && previewObjectUrl) {
+  if (result.kind === 'video' && previewObjectUrl) {
+    compressedPreviewUrl = URL.createObjectURL(result.blob);
+    getElement('video-compare-before').src = previewObjectUrl;
+    getElement('video-compare-after').src = compressedPreviewUrl;
+    getElement('video-compare-after-header').textContent = result.wasReduced
+      ? `COMPRESSED (${formatFileSize(result.compressedSize)})`
+      : `UNCHANGED (${formatFileSize(result.compressedSize)})`;
+    getElement('video-comparison').hidden = false;
+  } else if (result.kind === 'image' && previewObjectUrl) {
     compressedPreviewUrl = URL.createObjectURL(
       createFileBlob(result.bytes, result.mimeType)
     );
@@ -659,6 +748,82 @@ async function handleSelectedPdf(file, bytes, isSample = false) {
   }
 }
 
+async function handleSelectedVideo(file, bytes) {
+  cancelActiveOperation();
+  const operationId = activeOperationId;
+  activeAbortController = new AbortController();
+  const { signal } = activeAbortController;
+
+  resetPressState();
+  clearImagePreview();
+  showError('');
+  compressionResult = null;
+  selectedKind = 'video';
+  selectedPageCount = 0;
+  hasDigitalSignature = false;
+  selectedImageInfo = null;
+  selectedVideoInfo = null;
+
+  selectedFile = file;
+  selectedFileBytes = bytes;
+  getElement('filename').textContent = file.name;
+  getElement('filelabel').textContent = file.name;
+  getElement('filesub').textContent = formatFileSize(bytes.byteLength);
+  getElement('paperhead').textContent = 'VID / 001';
+  getElement('status').textContent = 'INSPECTING VIDEO';
+  getElement('filemeta').hidden = false;
+  getElement('filemeta').textContent =
+    `Analyzing stream • ${formatFileSize(bytes.byteLength)}`;
+
+  try {
+    const meta = await extractVideoMetadata(file);
+    if (operationId !== activeOperationId) {
+      return;
+    }
+    selectedVideoInfo = meta;
+
+    previewObjectUrl = URL.createObjectURL(file);
+    const previewVideo = getElement('video-preview');
+    if (previewVideo) {
+      previewVideo.src = previewObjectUrl;
+      previewVideo.hidden = false;
+    }
+    getElement('paper').querySelector('.document').hidden = true;
+
+    const dur = meta.duration ? `${meta.duration.toFixed(1)}s` : '';
+    const res = meta.width && meta.height ? `${meta.width}×${meta.height}` : '';
+    const audio = meta.hasAudio ? 'Audio' : 'No audio';
+    getElement('filemeta').textContent = [
+      dur,
+      res,
+      audio,
+      formatFileSize(bytes.byteLength),
+    ]
+      .filter(Boolean)
+      .join(' • ');
+    getElement('status').textContent = 'SYSTEM READY';
+
+    syncImageOptionsVisibility();
+    updatePresetDescription();
+    updateWarnings();
+    setCompressionUiState(false);
+  } catch (error) {
+    if (error?.name === 'AbortError' || operationId !== activeOperationId) {
+      return;
+    }
+    selectedFile = null;
+    selectedFileBytes = null;
+    selectedKind = null;
+    selectedVideoInfo = null;
+    syncImageOptionsVisibility();
+    updateWarnings();
+    getElement('filemeta').hidden = true;
+    getElement('filename').textContent = 'Awaiting file';
+    getElement('status').textContent = 'SYSTEM READY';
+    showError(error.message || 'Unable to inspect video stream.');
+  }
+}
+
 async function handleSelectedImage(file, bytes) {
   cancelActiveOperation();
   const operationId = activeOperationId;
@@ -744,15 +909,6 @@ async function selectBrowserFiles(fileList) {
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
-    if (UNSUPPORTED_FORMAT_PATTERN.test(file.name)) {
-      const ext = file.name.split('.').pop().toUpperCase();
-      resetWorkspace();
-      showError(
-        `${ext} compression is not yet supported. Gravipress supports PDF, JPG, PNG, WebP, and AVIF.`
-      );
-      return;
-    }
-
     if (bytes.length === 0) {
       resetWorkspace();
       showError('The selected file is empty (0 bytes).');
@@ -769,9 +925,23 @@ async function selectBrowserFiles(fileList) {
       return;
     }
 
+    if (detectVideoFormat(bytes)) {
+      await handleSelectedVideo(file, bytes);
+      return;
+    }
+
+    if (UNSUPPORTED_FORMAT_PATTERN.test(file.name)) {
+      const ext = file.name.split('.').pop().toUpperCase();
+      resetWorkspace();
+      showError(
+        `${ext} compression is not yet supported. Gravipress supports PDF, images, video (MP4/WebM), and archives.`
+      );
+      return;
+    }
+
     resetWorkspace();
     showError(
-      'Invalid or unsupported file. Contents do not match a valid PDF, JPEG, PNG, WebP, or AVIF signature.'
+      'Invalid or unsupported file. Contents do not match a valid PDF, image, or video signature.'
     );
   } catch {
     showError('Could not read the selected file from disk.');
@@ -1076,7 +1246,9 @@ async function startCompression() {
   }
 
   if (!selectedFile || !selectedFileBytes || !selectedKind) {
-    showError('Select a valid PDF or image file, or try the sample PDF first.');
+    showError(
+      'Select a valid PDF, image, or video file, or try the sample PDF first.'
+    );
     return;
   }
 
@@ -1110,7 +1282,44 @@ async function startCompression() {
     };
 
     let result;
-    if (selectedKind === 'image') {
+    if (selectedKind === 'video') {
+      const targetFormat = getElement('video-format')?.value || 'mp4';
+      const resVal = getElement('video-resolution')?.value;
+      const maxDim =
+        resVal === 'original'
+          ? Math.max(
+              selectedVideoInfo?.width || 1280,
+              selectedVideoInfo?.height || 720
+            )
+          : resVal && resVal !== 'auto'
+            ? Number(resVal)
+            : null;
+      const removeAudio = getElement('video-mute')?.checked || false;
+      const fpsVal = getElement('video-fps')?.value;
+      const maxFps = fpsVal && fpsVal !== 'auto' ? Number(fpsVal) : null;
+      const audioBitrateVal = getElement('video-audio-bitrate')?.value;
+      const audioBitrateKbps =
+        audioBitrateVal && audioBitrateVal !== 'auto'
+          ? Number(audioBitrateVal)
+          : null;
+      const customCrfVal = getElement('video-custom-crf')?.value;
+      const customCrf =
+        customCrfVal && customCrfVal !== 'auto' ? Number(customCrfVal) : null;
+
+      result = await compressVideo(selectedFile, selectedVideoInfo || {}, {
+        presetId: mode,
+        targetFormat,
+        maxDimensionOption: maxDim,
+        removeAudio,
+        customCrf,
+        maxFps,
+        audioBitrateKbps,
+        targetSizeBytes: getVideoTargetSizeBytes(),
+        signal,
+        onProgress,
+      });
+      result.kind = 'video';
+    } else if (selectedKind === 'image') {
       const qualityVal = useCustomQuality
         ? Number(getElement('custom-quality').value) / 100
         : null;
@@ -1189,6 +1398,15 @@ function handleDownload() {
   downloadButton.disabled = true;
 
   try {
+    if (compressionResult.kind === 'video') {
+      const blob = compressionResult.blob;
+      const filename = compressionResult.wasReduced
+        ? compressionResult.outputFilename
+        : selectedFile.name;
+      triggerFileDownload(blob, filename);
+      return;
+    }
+
     const mimeType =
       compressionResult.kind === 'image'
         ? compressionResult.mimeType
@@ -1430,6 +1648,15 @@ getElement('target-size').onchange = (event) => {
 
 getElement('enable-resize').onchange = (event) => {
   getElement('max-dimension').disabled = !event.target.checked;
+};
+
+getElement('video-custom-crf').oninput = (event) => {
+  getElement('video-crf-value').textContent = `CRF ${event.target.value}`;
+};
+
+getElement('video-target-size').onchange = (event) => {
+  getElement('video-custom-target-row').hidden =
+    event.target.value !== 'custom';
 };
 
 getElement('start').onclick = startCompression;

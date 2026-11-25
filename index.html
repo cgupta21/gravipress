@@ -102,9 +102,7 @@
             <span class="supported">WEBP</span>
             <span class="supported">AVIF</span>
             <span class="supported">ZIP / GZ</span>
-            <span class="soon" title="Video compression is not yet supported"
-              >MP4</span
-            >
+            <span class="supported">MP4 / WEBM</span>
             <span class="soon" title="Audio compression is not yet supported"
               >MP3</span
             >
@@ -199,6 +197,109 @@
 
             <p class="small option-note" id="metadata-note">
               Re-encoding removes EXIF/IPTC/XMP metadata and normalizes to sRGB.
+            </p>
+          </div>
+
+          <div class="video-options" id="video-options" hidden>
+            <div class="option-row">
+              <label for="video-format">Output format</label>
+              <select id="video-format">
+                <option value="mp4" selected>MP4 (H.264 / AAC)</option>
+                <option value="webm">WebM (VP8 / Vorbis)</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <label for="video-resolution">Max resolution</label>
+              <select id="video-resolution">
+                <option value="auto" selected>Preset Default</option>
+                <option value="original">Original resolution</option>
+                <option value="1080">1080p (FHD)</option>
+                <option value="720">720p (HD)</option>
+                <option value="480">480p (SD)</option>
+                <option value="360">360p</option>
+              </select>
+            </div>
+
+            <div class="option-row" id="video-crf-row">
+              <label for="video-custom-crf">
+                Quality (CRF):
+                <strong id="video-crf-value">Preset default</strong>
+              </label>
+              <input
+                type="range"
+                id="video-custom-crf"
+                min="18"
+                max="45"
+                step="1"
+                value="28"
+              />
+            </div>
+
+            <div class="option-row">
+              <label for="video-fps">Frame rate</label>
+              <select id="video-fps">
+                <option value="auto" selected>Preset / Source default</option>
+                <option value="60">60 FPS</option>
+                <option value="30">30 FPS</option>
+                <option value="24">24 FPS</option>
+                <option value="15">15 FPS</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <label for="video-audio-bitrate">Audio bitrate</label>
+              <select id="video-audio-bitrate">
+                <option value="auto" selected>Preset default</option>
+                <option value="128">128 kbps (High)</option>
+                <option value="96">96 kbps (Standard)</option>
+                <option value="64">64 kbps (Economy)</option>
+                <option value="32">32 kbps (Speech)</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <label for="video-target-size">Target file size</label>
+              <select id="video-target-size">
+                <option value="" selected>None (preset / CRF quality)</option>
+                <option value="1024">1 MB</option>
+                <option value="2048">2 MB</option>
+                <option value="5120">5 MB</option>
+                <option value="10240">10 MB</option>
+                <option value="25600">25 MB</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+
+            <div
+              class="option-row custom-target"
+              id="video-custom-target-row"
+              hidden
+            >
+              <label for="video-custom-target-val">Custom target</label>
+              <div class="inline-pair">
+                <input
+                  type="number"
+                  id="video-custom-target-val"
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  value="5"
+                />
+                <span class="unit-badge">MB</span>
+              </div>
+            </div>
+
+            <div class="option-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="video-mute" />
+                <span>Mute / Remove audio stream</span>
+              </label>
+            </div>
+
+            <p class="small option-note" id="video-note">
+              Browser-based FFmpeg WASM processing. Files never leave your
+              device.
             </p>
           </div>
 
@@ -346,6 +447,22 @@
                 <div class="doclines short"></div>
               </div>
               <img id="image-preview" alt="First page preview" hidden />
+              <video
+                id="video-preview"
+                playsinline
+                muted
+                loop
+                controls
+                hidden
+              ></video>
+              <video
+                id="video-preview"
+                playsinline
+                muted
+                loop
+                controls
+                hidden
+              ></video>
             </div>
             <div class="beam bottom"><i></i><i></i></div>
           </div>
@@ -381,6 +498,58 @@
                 <img id="compare-after" alt="Compressed image preview" />
                 <figcaption id="compare-after-label">Compressed</figcaption>
               </figure>
+            </div>
+            <div class="video-compare-wrapper" id="video-comparison" hidden>
+              <div class="video-compare-col">
+                <div class="video-compare-header">ORIGINAL</div>
+                <video
+                  id="video-compare-before"
+                  controls
+                  preload="metadata"
+                  playsinline
+                  muted
+                ></video>
+              </div>
+              <div class="video-compare-col">
+                <div
+                  class="video-compare-header"
+                  id="video-compare-after-header"
+                >
+                  COMPRESSED
+                </div>
+                <video
+                  id="video-compare-after"
+                  controls
+                  preload="metadata"
+                  playsinline
+                ></video>
+              </div>
+            </div>
+            <div class="video-compare-wrapper" id="video-comparison" hidden>
+              <div class="video-compare-col">
+                <div class="video-compare-header">ORIGINAL</div>
+                <video
+                  id="video-compare-before"
+                  controls
+                  preload="metadata"
+                  playsinline
+                  muted
+                ></video>
+              </div>
+              <div class="video-compare-col">
+                <div
+                  class="video-compare-header"
+                  id="video-compare-after-header"
+                >
+                  COMPRESSED
+                </div>
+                <video
+                  id="video-compare-after"
+                  controls
+                  preload="metadata"
+                  playsinline
+                ></video>
+              </div>
             </div>
             <dl class="metrics" id="metrics"></dl>
             <button class="action" id="download" type="button">

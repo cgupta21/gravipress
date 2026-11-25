@@ -984,3 +984,111 @@ dialog p {
     width: 100% !important;
   }
 }
+
+/* ==========================================================================
+   Video Options & Comparison
+   ========================================================================== */
+
+.video-options {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed #2b2d2130;
+  display: grid;
+  gap: 14px;
+}
+
+#video-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--silver-dark);
+}
+
+.video-compare-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+  .video-compare-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+.video-compare-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.video-compare-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--olive);
+}
+
+.video-compare-col video {
+  width: 100%;
+  max-height: 240px;
+  background: var(--silver-dark);
+  border: 1px solid #2b2d2130;
+  border-radius: 2px;
+}
+
+/* ==========================================================================
+   Video Options & Comparison
+   ========================================================================== */
+
+.video-options {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed #2b2d2130;
+  display: grid;
+  gap: 14px;
+}
+
+#video-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--silver-dark);
+}
+
+.video-compare-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+  .video-compare-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+.video-compare-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.video-compare-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--olive);
+}
+
+.video-compare-col video {
+  width: 100%;
+  max-height: 240px;
+  background: var(--silver-dark);
+  border: 1px solid #2b2d2130;
+  border-radius: 2px;
+}

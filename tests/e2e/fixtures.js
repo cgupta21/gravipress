@@ -401,5 +401,209 @@ export async function ensureTestFixtures(outputDir) {
     files.largeImage10Mb = target;
   }
 
+  // 21. Phase 6 Video Fixtures (Synthetically crafted MP4 & WebM)
+  {
+    // Minimal standard MP4 ISO container structure: ftyp + moov + mdat
+    const ftyp = Buffer.from([
+      0x00,
+      0x00,
+      0x00,
+      0x20, // 32 bytes length
+      0x66,
+      0x74,
+      0x79,
+      0x70, // 'ftyp'
+      0x69,
+      0x73,
+      0x6f,
+      0x6d, // 'isom'
+      0x00,
+      0x00,
+      0x02,
+      0x00, // minor version
+      0x69,
+      0x73,
+      0x6f,
+      0x6d, // compatible brand 1: 'isom'
+      0x69,
+      0x73,
+      0x6f,
+      0x32, // compatible brand 2: 'iso2'
+      0x61,
+      0x76,
+      0x63,
+      0x31, // compatible brand 3: 'avc1'
+      0x6d,
+      0x70,
+      0x34,
+      0x31, // compatible brand 4: 'mp41'
+    ]);
+    const mdatPayload = Buffer.alloc(64 * 1024, 0xaa); // 64 KB media data
+    const mdatHeader = Buffer.alloc(8);
+    mdatHeader.writeUInt32BE(mdatPayload.length + 8, 0);
+    mdatHeader.write('mdat', 4, 'ascii');
+    const sampleMp4 = Buffer.concat([ftyp, mdatHeader, mdatPayload]);
+
+    const mp4Path = path.join(outputDir, 'sample-video.mp4');
+    fs.writeFileSync(mp4Path, sampleMp4);
+    files.sampleVideoMp4 = mp4Path;
+
+    // WebM container structure: EBML header (1A 45 DF A3) + DocType 'webm'
+    const ebmlHeader = Buffer.from([
+      0x1a,
+      0x45,
+      0xdf,
+      0xa3, // EBML
+      0x9f, // size 31
+      0x42,
+      0x86,
+      0x81,
+      0x01, // EBMLVersion = 1
+      0x42,
+      0xf7,
+      0x81,
+      0x01, // EBMLReadVersion = 1
+      0x42,
+      0xf2,
+      0x81,
+      0x04, // EBMLMaxIDLength = 4
+      0x42,
+      0xf3,
+      0x81,
+      0x08, // EBMLMaxSizeLength = 8
+      0x42,
+      0x82,
+      0x84,
+      0x77,
+      0x65,
+      0x62,
+      0x6d, // DocType = 'webm'
+      0x42,
+      0x87,
+      0x81,
+      0x04, // DocTypeVersion = 4
+      0x42,
+      0x85,
+      0x81,
+      0x02, // DocTypeReadVersion = 2
+    ]);
+    const webmSegment = Buffer.alloc(64 * 1024, 0x55);
+    const sampleWebm = Buffer.concat([ebmlHeader, webmSegment]);
+
+    const webmPath = path.join(outputDir, 'sample-video.webm');
+    fs.writeFileSync(webmPath, sampleWebm);
+    files.sampleVideoWebm = webmPath;
+
+    // Corrupted video fixture
+    const corruptPath = path.join(outputDir, 'corrupt-video.mp4');
+    fs.writeFileSync(
+      corruptPath,
+      Buffer.from([0x00, 0x00, 0x00, 0x08, 0x66, 0x74, 0x79, 0x70])
+    );
+    files.corruptVideoMp4 = corruptPath;
+  }
+
+  // 21. Phase 6 Video Fixtures (Synthetically crafted MP4 & WebM)
+  {
+    // Minimal standard MP4 ISO container structure: ftyp + moov + mdat
+    const ftyp = Buffer.from([
+      0x00,
+      0x00,
+      0x00,
+      0x20, // 32 bytes length
+      0x66,
+      0x74,
+      0x79,
+      0x70, // 'ftyp'
+      0x69,
+      0x73,
+      0x6f,
+      0x6d, // 'isom'
+      0x00,
+      0x00,
+      0x02,
+      0x00, // minor version
+      0x69,
+      0x73,
+      0x6f,
+      0x6d, // compatible brand 1: 'isom'
+      0x69,
+      0x73,
+      0x6f,
+      0x32, // compatible brand 2: 'iso2'
+      0x61,
+      0x76,
+      0x63,
+      0x31, // compatible brand 3: 'avc1'
+      0x6d,
+      0x70,
+      0x34,
+      0x31, // compatible brand 4: 'mp41'
+    ]);
+    const mdatPayload = Buffer.alloc(64 * 1024, 0xaa); // 64 KB media data
+    const mdatHeader = Buffer.alloc(8);
+    mdatHeader.writeUInt32BE(mdatPayload.length + 8, 0);
+    mdatHeader.write('mdat', 4, 'ascii');
+    const sampleMp4 = Buffer.concat([ftyp, mdatHeader, mdatPayload]);
+
+    const mp4Path = path.join(outputDir, 'sample-video.mp4');
+    fs.writeFileSync(mp4Path, sampleMp4);
+    files.sampleVideoMp4 = mp4Path;
+
+    // WebM container structure: EBML header (1A 45 DF A3) + DocType 'webm'
+    const ebmlHeader = Buffer.from([
+      0x1a,
+      0x45,
+      0xdf,
+      0xa3, // EBML
+      0x9f, // size 31
+      0x42,
+      0x86,
+      0x81,
+      0x01, // EBMLVersion = 1
+      0x42,
+      0xf7,
+      0x81,
+      0x01, // EBMLReadVersion = 1
+      0x42,
+      0xf2,
+      0x81,
+      0x04, // EBMLMaxIDLength = 4
+      0x42,
+      0xf3,
+      0x81,
+      0x08, // EBMLMaxSizeLength = 8
+      0x42,
+      0x82,
+      0x84,
+      0x77,
+      0x65,
+      0x62,
+      0x6d, // DocType = 'webm'
+      0x42,
+      0x87,
+      0x81,
+      0x04, // DocTypeVersion = 4
+      0x42,
+      0x85,
+      0x81,
+      0x02, // DocTypeReadVersion = 2
+    ]);
+    const webmSegment = Buffer.alloc(64 * 1024, 0x55);
+    const sampleWebm = Buffer.concat([ebmlHeader, webmSegment]);
+
+    const webmPath = path.join(outputDir, 'sample-video.webm');
+    fs.writeFileSync(webmPath, sampleWebm);
+    files.sampleVideoWebm = webmPath;
+
+    // Corrupted video fixture
+    const corruptPath = path.join(outputDir, 'corrupt-video.mp4');
+    fs.writeFileSync(
+      corruptPath,
+      Buffer.from([0x00, 0x00, 0x00, 0x08, 0x66, 0x74, 0x79, 0x70])
+    );
+    files.corruptVideoMp4 = corruptPath;
+  }
+
   return files;
 }

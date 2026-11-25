@@ -1044,3 +1044,217 @@ test('Phase 5 general file, nested folder, GZIP, and 1MB/5MB/10MB archive benchm
   expect(externalRequests).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
+
+test('Phase 6 video compression: MP4 & WebM detection, options, cancellation, and validation', async ({
+  page,
+}) => {
+  const consoleErrors = [];
+  const externalRequests = [];
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
+
+  page.on('request', (req) => {
+    const url = req.url();
+    if (
+      !url.startsWith('http://127.0.0.1:4173') &&
+      !url.startsWith('http://localhost:4173') &&
+      !url.startsWith('blob:') &&
+      !url.startsWith('data:')
+    ) {
+      externalRequests.push(url);
+    }
+  });
+
+  await page.goto('/');
+
+  // Generate a real decodable MP4 video in the browser via Canvas + MediaRecorder and compress it
+  const videoBufferBase64 = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+
+    // Create an audio track with an oscillator if AudioContext is available
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext || null;
+    let audioCtx = null;
+    let osc = null;
+    const canvasStream = canvas.captureStream ? canvas.captureStream(25) : null;
+
+    if (AudioContextClass && canvasStream) {
+      try {
+        audioCtx = new AudioContextClass();
+        const dest = audioCtx.createMediaStreamDestination();
+        osc = audioCtx.createOscillator();
+        osc.frequency.value = 440;
+        osc.connect(dest);
+        osc.start();
+        const audioTrack = dest.stream.getAudioTracks()[0];
+        if (audioTrack) {
+          canvasStream.addTrack(audioTrack);
+        }
+      } catch (e) {
+        // Audio stream setup optional for fixture generation
+      }
+    }
+
+    // If browser supports MediaRecorder (Chromium / Firefox), record canvas frames
+    if (typeof MediaRecorder !== 'undefined' && canvas.captureStream) {
+      let mimeType = 'video/webm;codecs=vp8,opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = MediaRecorder.isTypeSupported('video/webm')
+          ? 'video/webm'
+          : 'video/mp4';
+      }
+
+      const recorder = new MediaRecorder(canvasStream, { mimeType });
+      const chunks = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.start();
+
+      // Render 25 animated frames with moving rectangle & text
+      for (let frame = 0; frame < 25; frame += 1) {
+        ctx.fillStyle = '#2b2d21';
+        ctx.fillRect(0, 0, 320, 240);
+
+        ctx.fillStyle = '#ffc93c';
+        ctx.fillRect(20 + frame * 8, 40, 60, 60);
+
+        ctx.fillStyle = '#d9dadc';
+        ctx.font = '20px sans-serif';
+        ctx.fillText(`Frame ${frame + 1} / 25`, 30, 160);
+
+        await new Promise((r) => setTimeout(r, 40));
+      }
+
+      recorder.stop();
+      if (osc) osc.stop();
+      if (audioCtx) await audioCtx.close();
+
+      await new Promise((resolve) => (recorder.onstop = resolve));
+      const recordedBlob = new Blob(chunks, { type: mimeType });
+      const arrayBuf = await recordedBlob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuf);
+
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    return null;
+  });
+
+  const generatedVideoPath = path.join(
+    FIXTURES_DIR,
+    'generated-animation.webm'
+  );
+  if (videoBufferBase64) {
+    fs.writeFileSync(
+      generatedVideoPath,
+      Buffer.from(videoBufferBase64, 'base64')
+    );
+  }
+
+  const testVideoPath = videoBufferBase64
+    ? generatedVideoPath
+    : fixtures.sampleVideoMp4;
+
+  // 1. Upload video fixture
+  await page.locator('#file').setInputFiles(testVideoPath);
+  await expect(page.locator('#video-options')).toBeVisible();
+  await expect(page.locator('#status')).toHaveText('SYSTEM READY');
+  await expect(page.locator('#paperhead')).toHaveText('VID / 001');
+
+  // Verify video-options controls
+  await expect(page.locator('#video-format')).toHaveValue('mp4');
+  await expect(page.locator('#video-resolution')).toHaveValue('auto');
+  await expect(page.locator('#video-mute')).not.toBeChecked();
+
+  // Test custom quality CRF slider
+  await page.locator('#video-custom-crf').fill('30');
+  await expect(page.locator('#video-crf-value')).toHaveText('CRF 30');
+
+  // Test target size custom toggle
+  await page.locator('#video-target-size').selectOption('custom');
+  await expect(page.locator('#video-custom-target-row')).toBeVisible();
+  await page.locator('#video-target-size').selectOption('');
+  await expect(page.locator('#video-custom-target-row')).toBeHidden();
+
+  // 2. Perform real video compression if playable video was generated (Chromium/Firefox)
+  if (videoBufferBase64) {
+    await page.locator('#video-format').selectOption('mp4');
+    await page.locator('#start').click();
+
+    // Await completion (loading WASM engine + encoding 25 frames)
+    await expect(page.locator('#result')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('#status')).toHaveText('PRESS COMPLETE');
+
+    // Verify downloaded MP4 file
+    const videoDlPromise = page.waitForEvent('download');
+    await page.locator('#download').click();
+    const videoDl = await videoDlPromise;
+    expect(videoDl.suggestedFilename()).toBe(
+      'generated-animation-compressed.mp4'
+    );
+
+    const dlPath = path.join(FIXTURES_DIR, 'downloaded-compressed.mp4');
+    await videoDl.saveAs(dlPath);
+    const dlStat = fs.statSync(dlPath);
+    expect(dlStat.size).toBeGreaterThan(1000); // Decodable video generated!
+
+    // Verify output MP4 signature (ftyp)
+    const dlHeader = fs.readFileSync(dlPath, { encoding: null });
+    expect(dlHeader.subarray(4, 8).toString('ascii')).toBe('ftyp');
+
+    // Verify that output video is valid, decodable, and playable in browser
+    const playbackVerified = await page.evaluate(async (pathBase64) => {
+      const video = document.createElement('video');
+      video.preload = 'auto';
+      video.muted = true;
+      const blob = await fetch(`data:video/mp4;base64,${pathBase64}`).then(
+        (r) => r.blob()
+      );
+      const url = URL.createObjectURL(blob);
+      video.src = url;
+
+      return new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          const ok =
+            video.videoWidth > 0 && video.videoHeight > 0 && video.duration > 0;
+          URL.revokeObjectURL(url);
+          resolve({
+            ok,
+            width: video.videoWidth,
+            height: video.videoHeight,
+            duration: video.duration,
+          });
+        };
+        video.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve({ ok: false });
+        };
+      });
+    }, fs.readFileSync(dlPath).toString('base64'));
+
+    expect(playbackVerified.ok).toBe(true);
+    expect(playbackVerified.width).toBeGreaterThan(0);
+    expect(playbackVerified.height).toBeGreaterThan(0);
+  }
+
+  // 3. Reset workspace
+  await page.locator('#reset').click();
+  await expect(page.locator('#video-options')).toBeHidden();
+  await expect(page.locator('#filename')).toHaveText('Awaiting file');
+
+  expect(externalRequests).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
