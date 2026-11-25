@@ -7,7 +7,7 @@
     <title>Gravipress — Engineered to be smaller.</title>
     <meta
       name="description"
-      content="Gravipress is a local-first file compression utility. Preview the industrial compression workspace."
+      content="Gravipress is a local-first PDF compression utility. Compress PDFs directly in your browser without uploading files."
     />
 
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -22,7 +22,7 @@
     />
     <meta
       property="og:description"
-      content="A local-first file compression workspace."
+      content="A local-first PDF compression workspace."
     />
     <meta property="og:image" content="/social-preview.png" />
     <meta property="og:image:width" content="1200" />
@@ -46,7 +46,7 @@
       </a>
       <div class="nav-right">
         <button class="link" id="about">About</button>
-        <span class="version">V.01</span>
+        <span class="version">V.02</span>
       </div>
     </header>
 
@@ -58,7 +58,7 @@
         </div>
         <p class="intro">
           A little pressure goes a long way.<br />
-          Shrink your files, without sending them anywhere.<br />
+          Shrink your PDFs, without sending them anywhere.<br />
           <span>DESIGNED FOR LOCAL PROCESSING.</span>
         </p>
       </section>
@@ -74,10 +74,10 @@
             type="file"
             id="file"
             hidden
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.mp3,.zip"
+            accept=".pdf,application/pdf,.jpg,.jpeg,.png,.webp,.mp4,.mp3,.zip"
           />
 
-          <button class="drop" id="drop">
+          <button class="drop" id="drop" type="button">
             <svg
               width="32"
               height="32"
@@ -88,18 +88,18 @@
             >
               <path d="M12 16V3m-5 5 5-5 5 5M3 16v5h18v-5" />
             </svg>
-            <strong id="filelabel">Drop your file here</strong>
+            <strong id="filelabel">Drop your PDF here</strong>
             <span id="filesub">or click to browse your device</span>
           </button>
 
           <div class="types">
-            <span>PDF</span>
-            <span>JPG</span>
-            <span>PNG</span>
-            <span>WEBP</span>
-            <span>MP4</span>
-            <span>MP3</span>
-            <span>ZIP</span>
+            <span class="supported">PDF</span>
+            <span class="soon" title="Not yet supported in Phase 2">JPG</span>
+            <span class="soon" title="Not yet supported in Phase 2">PNG</span>
+            <span class="soon" title="Not yet supported in Phase 2">WEBP</span>
+            <span class="soon" title="Not yet supported in Phase 2">MP4</span>
+            <span class="soon" title="Not yet supported in Phase 2">MP3</span>
+            <span class="soon" title="Not yet supported in Phase 2">ZIP</span>
           </div>
 
           <fieldset>
@@ -121,17 +121,27 @@
           </fieldset>
 
           <p class="small" id="quality">
-            A balance between quality and file size.
+            Tries structural optimization first, then ~144 DPI (JPEG 0.75) with
+            bounded adaptive tuning if needed.
           </p>
 
-          <button class="action" id="start">
-            <span>Compress file</span>
+          <p class="warning" id="warning" role="status" hidden></p>
+
+          <button class="action" id="start" type="button">
+            <span>Compress PDF</span>
             <span aria-hidden="true">↓</span>
           </button>
 
           <div class="minor">
-            <button class="link" id="sample">Try sample file</button>
-            <button class="link" id="reset">Reset workspace</button>
+            <button class="link" id="sample" type="button">
+              Try sample PDF
+            </button>
+            <button class="link" id="cancel" type="button" hidden>
+              Cancel compression
+            </button>
+            <button class="link" id="reset" type="button">
+              Reset workspace
+            </button>
           </div>
 
           <p id="error" role="alert" hidden></p>
@@ -157,7 +167,7 @@
                 <div class="docgrid"></div>
                 <div class="doclines short"></div>
               </div>
-              <img id="image-preview" alt="" hidden />
+              <img id="image-preview" alt="First page preview" hidden />
             </div>
             <div class="beam bottom"><i></i><i></i></div>
           </div>
@@ -166,13 +176,14 @@
             <i></i>
             <span id="status">SYSTEM READY</span>
           </div>
-          <div class="filename" id="filename">Awaiting file</div>
+          <div class="filename" id="filename">Awaiting PDF</div>
+          <div class="filemeta" id="filemeta" hidden></div>
 
           <div
             class="progress"
             id="progress"
             role="progressbar"
-            aria-label="Demo animation progress"
+            aria-label="PDF compression progress"
             aria-valuemin="0"
             aria-valuemax="100"
             aria-valuenow="0"
@@ -181,10 +192,11 @@
           </div>
 
           <div class="result" id="result" hidden>
-            <h2>Press complete.</h2>
-            <p>Animation preview finished. No file was compressed.</p>
-            <button class="action" id="download">
-              Download <span>↓</span>
+            <h2 id="result-title">Press complete.</h2>
+            <p id="result-summary"></p>
+            <dl class="metrics" id="metrics"></dl>
+            <button class="action" id="download" type="button">
+              Download PDF <span aria-hidden="true">↓</span>
             </button>
           </div>
         </div>
@@ -197,7 +209,8 @@
       </footer>
 
       <p class="notice">
-        UI prototype — real compression and downloads are not connected.
+        Client-side PDF compression — files never leave your browser. Other
+        formats are not yet supported.
       </p>
     </main>
 
