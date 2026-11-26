@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build-ffmpeg-wasm:
-    name: Build FFmpeg 6.1.6 WASM Core
+    name: Build FFmpeg 5.1.10 WASM Core
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -51,7 +51,7 @@ jobs:
 
       - name: Generate GitHub Workflow Summary
         run: |
-          echo "###  FFmpeg 6.1.6 WASM Core Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "###  FFmpeg 5.1.10 WASM Core Build Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Artifact | Size |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
@@ -67,7 +67,7 @@ jobs:
       - name: Upload Core Binaries and Source Archive
         uses: actions/upload-artifact@v4
         with:
-          name: gravipress-ffmpeg-core-6.1.6
+          name: gravipress-ffmpeg-core-5.1.10
           path: output-dist/
           retention-days: 14
           if-no-files-found: error

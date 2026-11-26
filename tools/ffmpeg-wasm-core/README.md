@@ -1,6 +1,6 @@
 # Gravipress Reproducible FFmpeg.wasm Core Builder
 
-This isolated directory contains the Docker and toolchain configuration to build a secure, reproducible, single-threaded WebAssembly core based on **FFmpeg 6.1.6 LTS**.
+This isolated directory contains the Docker and toolchain configuration to build a secure, reproducible, single-threaded WebAssembly core based on **FFmpeg 5.1.10 LTS**.
 
 ---
 
@@ -11,7 +11,7 @@ All sources, toolchains, and libraries are pinned to immutable releases or speci
 | Component | Pinned Version / Commit | Source Repository / Tarball | License |
 | :--- | :--- | :--- | :--- |
 | **Toolchain** | Emscripten 3.1.40 | `emscripten/emsdk:3.1.40` (Docker Hub) | MIT / University of Illinois |
-| **FFmpeg** | 6.1.6 (`n6.1.6`) | `https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n6.1.6.tar.gz` | GPL-2.0-or-later |
+| **FFmpeg** | 5.1.10 (`n5.1.10`) | `https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n5.1.10.tar.gz` | GPL-2.0-or-later |
 | **x264** | `baee400fa9ced6` | `https://github.com/ffmpegwasm/x264.git` (pinned commit) | GPL-2.0-or-later |
 | **libvpx** | 1.14.0 (`v1.14.0`) | `https://github.com/webmproject/libvpx/archive/refs/tags/v1.14.0.tar.gz` | BSD-3-Clause |
 | **libmp3lame** | 3.100 | `https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz` | LGPL-2.0-or-later |
@@ -28,7 +28,7 @@ All sources, toolchains, and libraries are pinned to immutable releases or speci
 2. `ffmpeg-core.wasm`: Compiled WebAssembly binary (~18–20 MB, down from 32.2 MB).
 3. `manifest.json`: Structured build metadata, configuration flags, and codec support list.
 4. `THIRD_PARTY_LICENSES.txt`: Comprehensive license notices and copyright acknowledgments.
-5. `ffmpeg-corresponding-source-6.1.6.tar.gz`: Complete machine-readable corresponding source archive (satisfies GPL-2.0 §3).
+5. `ffmpeg-corresponding-source-5.1.10.tar.gz`: Complete machine-readable corresponding source archive (satisfies GPL-2.0 §3).
 6. `SHA256SUMS.txt`: Cryptographic SHA-256 verification hashes for all generated files.
 
 ---
@@ -45,6 +45,6 @@ Because the local Windows machine does not have Docker or WSL2 installed, compil
    - Click **Run workflow** -> Select branch `main` -> Click **Run workflow**.
    *(Alternatively, using GitHub CLI: `gh workflow run build-custom-ffmpeg.yml`)*
 3. When the ~15-minute job completes:
-   - Download the generated `gravipress-ffmpeg-core-6.1.6` artifact zip.
+   - Download the generated `gravipress-ffmpeg-core-5.1.10` artifact zip.
    - Verify that `sha256sum --check SHA256SUMS.txt` passes.
    - Copy `ffmpeg-core.js` and `ffmpeg-core.wasm` into `public/ffmpeg/` to replace the outdated `@ffmpeg/core@0.12.10` files.

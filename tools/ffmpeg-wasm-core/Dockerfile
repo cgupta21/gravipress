@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Isolated Reproducible FFmpeg.wasm Build for Gravipress
-# Toolchain: Emscripten 3.1.40 (Pinned Digest) | Target: FFmpeg 6.1.6 LTS (Single-thread ESM)
+# Toolchain: Emscripten 3.1.40 (Pinned Digest) | Target: FFmpeg 5.1.10 LTS (Single-thread ESM)
 
 FROM emscripten/emsdk:3.1.40@sha256:c1e807a6e03ac5bd5b37bae2ace3c46c08579e2ddeb951037a3b8dac7067f2cc AS build-env
 
@@ -34,8 +34,9 @@ RUN curl -fsSL -o /sources/lame.tar.gz https://downloads.sourceforge.net/project
     echo "c9b32b4253be5ae63d1ff16eea06b94b5f0f2951b7a02aceef58e3a3ce49c51f  /sources/libopus.tar.gz" >> /sources/checksums.txt && \
     sha256sum -c /sources/checksums.txt
 
-# Clone FFmpeg 6.1.6 LTS source (pinned tag n6.1.6)
-RUN git clone --depth 1 --branch n6.1.6 https://github.com/FFmpeg/FFmpeg.git /sources/ffmpeg
+# Clone FFmpeg 5.1.10 LTS source (pinned tag n5.1.10, verified commit 19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb)
+RUN git clone --depth 1 --branch n5.1.10 https://github.com/FFmpeg/FFmpeg.git /sources/ffmpeg && \
+    cd /sources/ffmpeg && test "$(git rev-parse HEAD)" = "19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb"
 
 # Clone x264 from verified GitHub mirror and checkout exact pinned commit
 RUN git clone https://github.com/ffmpegwasm/x264.git /sources/x264 && \
@@ -162,7 +163,7 @@ RUN echo "PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR" && \
     rm -f /tmp/opus_probe.c /tmp/opus_probe.js /tmp/opus_probe.wasm
 
 # -----------------------------------------------------------------------------
-# 8. Configure & Build FFmpeg 6.1.6
+# 8. Configure & Build FFmpeg 5.1.10
 # -----------------------------------------------------------------------------
 RUN cd /sources/ffmpeg && \
     (emconfigure env \
@@ -253,11 +254,11 @@ RUN cd /sources/ffmpeg && \
 # 10. Package Manifest, License Notices & Corresponding Source Archive
 # -----------------------------------------------------------------------------
 RUN cat <<'EOF' > /dist/THIRD_PARTY_LICENSES.txt
-Gravipress Custom Multimedia Engine (FFmpeg 6.1.6 Core)
+Gravipress Custom Multimedia Engine (FFmpeg 5.1.10 Core)
 License: GNU General Public License v2.0 or later (GPL-2.0-or-later)
 
 This binary package incorporates software developed by:
-- FFmpeg Project (FFmpeg 6.1.6, GPL-2.0-or-later, https://ffmpeg.org)
+- FFmpeg Project (FFmpeg 5.1.10, GPL-2.0-or-later, https://ffmpeg.org)
 - VideoLAN / x264 contributors (x264 baee400fa9ced6, GPL-2.0-or-later, https://www.videolan.org/developers/x264.html)
 - WebM Project / Google LLC (libvpx 1.14.0, BSD-3-Clause, https://www.webmproject.org/)
 - LAME Project (LAME 3.100, LGPL-2.0-or-later, https://lame.sourceforge.io/)
@@ -265,14 +266,14 @@ This binary package incorporates software developed by:
 - Xiph.Org, Skype, Mozilla (libopus 1.4, BSD-3-Clause, https://opus-codec.org/)
 
 Full corresponding source code and build recipes are archived in:
-ffmpeg-corresponding-source-6.1.6.tar.gz
+ffmpeg-corresponding-source-5.1.10.tar.gz
 EOF
 
 RUN cat <<'EOF' > /dist/manifest.json
 {
   "name": "gravipress-ffmpeg-core",
-  "version": "6.1.6",
-  "ffmpegVersion": "n6.1.6",
+  "version": "5.1.10",
+  "ffmpegVersion": "n5.1.10",
   "threading": "single-thread",
   "license": "GPL-2.0-or-later",
   "emscriptenVersion": "3.1.40",
@@ -303,11 +304,11 @@ RUN cat <<'EOF' > /dist/manifest.json
 EOF
 
 # Package corresponding source archive
-RUN tar -czf /dist/ffmpeg-corresponding-source-6.1.6.tar.gz -C /sources .
+RUN tar -czf /dist/ffmpeg-corresponding-source-5.1.10.tar.gz -C /sources .
 
 # Compute Cryptographic SHA-256 Checksums
 WORKDIR /dist
-RUN sha256sum ffmpeg-core.js ffmpeg-core.wasm manifest.json THIRD_PARTY_LICENSES.txt ffmpeg-corresponding-source-6.1.6.tar.gz > SHA256SUMS.txt
+RUN sha256sum ffmpeg-core.js ffmpeg-core.wasm manifest.json THIRD_PARTY_LICENSES.txt ffmpeg-corresponding-source-5.1.10.tar.gz > SHA256SUMS.txt
 
 # Final Scratch Stage for Docker Buildx export
 FROM scratch AS export
