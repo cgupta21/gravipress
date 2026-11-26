@@ -7,7 +7,7 @@
   --grey: #d9dadc;
   --yellow: #ffc93c;
   --white: #f5f5f0;
-  --muted: #74776b;
+  --muted: #5c5f54;
   --dark: #1c1e17;
   font-family: Arial, Helvetica, sans-serif;
   color: var(--olive);
@@ -44,6 +44,12 @@ input:focus-visible + span,
 [tabindex]:focus-visible {
   outline: 3px solid #897000;
   outline-offset: 4px;
+}
+
+.machine-area button:focus-visible,
+.machine-area a:focus-visible,
+.machine-area [tabindex]:focus-visible {
+  outline-color: var(--yellow);
 }
 
 [hidden] {
@@ -122,7 +128,8 @@ input:focus-visible + span,
 }
 
 .types span.soon {
-  opacity: 0.5;
+  color: #5c5f54;
+  border-color: #5c5f54;
 }
 
 .brand-logo {

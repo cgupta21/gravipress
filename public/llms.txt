@@ -1,0 +1,38 @@
+# Gravipress
+
+> Gravipress is a local-first, privacy-first file compression utility that runs entirely in the browser. It compresses PDF documents, raster images (JPEG, PNG, WebP, AVIF), batch queues, ZIP archives, and GZIP streams without uploading files to any server. No account, login, or installation required.
+
+## Application
+
+- [Gravipress](https://gravipress.pages.dev/): Browser-based file compression tool for PDFs, images, batch queues, and archives.
+
+## Documentation
+
+- [README](https://github.com/cgupta21/gravipress/blob/release/v1.0-non-multimedia/README.md): Full documentation including supported formats, compression presets, processing limits, and third-party licensing notices.
+- [MIT License](https://github.com/cgupta21/gravipress/blob/release/v1.0-non-multimedia/LICENSE): Open-source MIT license for Gravipress.
+- [Third-Party Licenses](https://github.com/cgupta21/gravipress/blob/release/v1.0-non-multimedia/THIRD_PARTY_LICENSES.md): Runtime dependency copyright notices and license texts.
+
+## Supported Formats (v1.0)
+
+- **PDF** (.pdf) — structural optimization and adaptive quality reduction via PDF.js and pdf-lib
+- **JPEG** (.jpg, .jpeg) — quality-based compression via browser Canvas API
+- **PNG** (.png) — lossless and near-lossless compression via browser Canvas API
+- **WebP** (.webp) — quality-based compression via browser Canvas API
+- **AVIF** (.avif) — browser-dependent compression via browser Canvas API
+- **ZIP** (.zip) — DEFLATE compression for files and folders (levels 0, 1, 6, 9)
+- **GZIP** (.gz) — DEFLATE compression for single files
+
+## Privacy
+
+All file processing is performed entirely within the user's browser. No files, metadata, or processing results are transmitted to any external server. Gravipress operates fully offline after the initial page load.
+
+## Processing Limits
+
+- PDF: up to 200 MB, up to 2,000 pages
+- Images: up to 50 MB per file
+- Batch queue: up to 20 files, up to 20 MB each
+- ZIP archive: up to 500 files, up to 500 MB total (browser memory dependent)
+
+## Technology
+
+Built with Vite, PDF.js (Mozilla), pdf-lib, and fflate. Deployed on Cloudflare Pages. No server-side processing.
