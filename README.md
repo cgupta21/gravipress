@@ -1,9 +1,9 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/brand/logo-horizontal-light.png" />
-  <source media="(prefers-color-scheme: light)" srcset="public/brand/logo-horizontal-dark.png" />
-  <img alt="Gravipress" src="public/brand/logo-horizontal-dark.png" width="260" />
+  <source media="(prefers-color-scheme: dark)" srcset="public/brand/logo-horizontal-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="public/brand/logo-horizontal-light.png" />
+  <img alt="Gravipress" src="public/brand/logo-horizontal-light.png" width="260" />
 </picture>
 
 # Gravipress
