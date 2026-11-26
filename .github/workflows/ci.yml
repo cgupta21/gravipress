@@ -1,0 +1,58 @@
+name: Gravipress v1.0 CI
+
+on:
+  push:
+    branches:
+      - release/v1.0-non-multimedia
+  pull_request:
+    branches:
+      - release/v1.0-non-multimedia
+
+permissions:
+  contents: read
+
+jobs:
+  verify-v1:
+    name: Build & Verify v1.0 Non-Multimedia Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify zero FFmpeg dependencies in lockfile
+        run: |
+          if grep -qi "ffmpeg" package.json package-lock.json; then
+            echo "ERROR: FFmpeg dependency reference found in v1.0 release!"
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run production build
+        run: npm run build
+
+      - name: Verify zero FFmpeg or WASM assets in production bundle
+        run: |
+          if find dist -iname "*.wasm" | grep -q .; then
+            echo "ERROR: Unexpected WASM binary found in dist/"
+            exit 1
+          fi
+          if grep -riE "ffmpeg|libx264|libvpx" dist/assets/ dist/index.html; then
+            echo "ERROR: Unexpected FFmpeg reference found in production bundle!"
+            exit 1
+          fi
+          echo "Verified clean non-multimedia production bundle."

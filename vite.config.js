@@ -38,6 +38,17 @@ function pdfjsAssetsPlugin() {
         );
       }
     },
+    configurePreviewServer(server) {
+      const vercelPath = path.join(rootDir, 'vercel.json');
+      if (fs.existsSync(vercelPath)) {
+        const cfg = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
+        const headers = cfg.headers?.[0]?.headers || [];
+        server.middlewares.use((_req, res, next) => {
+          for (const h of headers) res.setHeader(h.key, h.value);
+          next();
+        });
+      }
+    },
     writeBundle(options) {
       const outDir = options.dir || path.join(rootDir, 'dist');
       for (const dir of assetDirs) {

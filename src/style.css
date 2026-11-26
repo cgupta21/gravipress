@@ -38,7 +38,10 @@ button {
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible + span {
+select:focus-visible,
+input:focus-visible,
+input:focus-visible + span,
+[tabindex]:focus-visible {
   outline: 3px solid #897000;
   outline-offset: 4px;
 }
@@ -923,6 +926,28 @@ dialog h2 {
 dialog p {
   font-size: 14px;
   line-height: 1.7;
+}
+
+#licenses-dialog {
+  width: min(520px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+#licenses-dialog a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.license-list {
+  margin: 12px 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.license-list li {
+  margin-bottom: 6px;
 }
 
 /* ==========================================================================

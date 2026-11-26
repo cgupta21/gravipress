@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2b2d21" />
-    <title>Gravipress — Engineered to be smaller.</title>
+    <title>Gravipress — Local-First PDF, Image &amp; Archive Compressor</title>
     <meta
       name="description"
-      content="Gravipress is a local-first PDF compression utility. Compress PDFs directly in your browser without uploading files."
+      content="Gravipress is a local-first file compression utility. Compress PDFs, images, batch queues, and ZIP/GZIP archives directly in your browser without uploading files."
     />
 
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -18,17 +18,50 @@
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="Gravipress — Engineered to be smaller."
+      content="Gravipress — Local-First PDF, Image &amp; Archive Compressor"
     />
     <meta
       property="og:description"
-      content="A local-first PDF compression workspace."
+      content="Compress PDFs, images, batch queues, and ZIP/GZIP archives directly in your browser. Files never leave your device."
     />
     <meta property="og:image" content="/social-preview.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Gravipress — Local-First PDF, Image &amp; Archive Compressor"
+    />
+    <meta
+      name="twitter:description"
+      content="Compress PDFs, images, batch queues, and ZIP/GZIP archives directly in your browser. Files never leave your device."
+    />
     <meta name="twitter:image" content="/social-preview.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Gravipress",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any (Web Browser)",
+        "browserRequirements": "Requires JavaScript and HTML5 Web Workers",
+        "softwareVersion": "1.0.0",
+        "description": "A local-first browser compression utility for PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives.",
+        "featureList": [
+          "Client-side PDF compression",
+          "Lossless and lossy image compression (PNG, JPEG, WebP, AVIF)",
+          "Batch file compression with ZIP export",
+          "Lossless ZIP and GZIP archive creation",
+          "100% browser-local processing with zero file uploads"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
 
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -45,8 +78,9 @@
         />
       </a>
       <div class="nav-right">
+        <button class="link" id="licenses">Licenses</button>
         <button class="link" id="about">About</button>
-        <span class="version">V.05</span>
+        <span class="version">V1.0</span>
       </div>
     </header>
 
@@ -75,7 +109,7 @@
             id="file"
             hidden
             multiple
-            accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.avif,image/avif,.mp4,.mp3,.zip"
+            accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.avif,image/avif,.zip"
           />
 
           <button class="drop" id="drop" type="button">
@@ -397,8 +431,8 @@
       </footer>
 
       <p class="notice">
-        Client-side PDF &amp; image compression — files never leave your
-        browser. Video, audio, and archives are not yet supported.
+        Client-side PDF, image, batch, and ZIP/GZIP archive compression — files
+        never leave your browser.
       </p>
     </main>
 
@@ -407,6 +441,69 @@
     <dialog id="dialog">
       <h2 id="dialog-title"></h2>
       <p id="dialog-text"></p>
+      <form method="dialog">
+        <button class="action">Close <span>×</span></button>
+      </form>
+    </dialog>
+
+    <dialog id="licenses-dialog" aria-labelledby="licenses-title">
+      <h2 id="licenses-title">Open Source &amp; Licenses (v1.0)</h2>
+      <p>
+        Gravipress v1.0 is licensed under the <strong>MIT License</strong> and
+        performs all PDF, image, batch, and ZIP/GZIP archive compression locally
+        in your browser using the following open-source libraries:
+      </p>
+      <ul class="license-list">
+        <li>
+          <strong>pdf-lib</strong> (<code>1.17.1</code>) — Copyright (c) 2019
+          Andrew Dillon —
+          <a href="/licenses/pdf-lib-MIT.txt" target="_blank" rel="noopener"
+            >MIT License</a
+          >
+        </li>
+        <li>
+          <strong>pdfjs-dist</strong> (<code>6.5.438</code>) — Copyright (c)
+          2011-present Mozilla Foundation and contributors —
+          <a
+            href="/licenses/pdfjs-dist-Apache-2.0.txt"
+            target="_blank"
+            rel="noopener"
+            >Apache License 2.0</a
+          >
+        </li>
+        <li>
+          <strong>fflate</strong> (<code>0.8.3</code>) — Copyright (c) 2023
+          Arjun Barrett —
+          <a href="/licenses/fflate-MIT.txt" target="_blank" rel="noopener"
+            >MIT License</a
+          >
+        </li>
+        <li>
+          <strong>upng-js</strong> (<code>2.1.0</code>) — Copyright (c) 2017
+          Photopea —
+          <a href="/licenses/upng-js-MIT.txt" target="_blank" rel="noopener"
+            >MIT License</a
+          >
+        </li>
+        <li>
+          <strong>Transitive Runtime Notices:</strong>
+          <a href="/licenses/pako-MIT.txt" target="_blank" rel="noopener"
+            >pako (MIT)</a
+          >,
+          <a href="/licenses/tslib-0BSD.txt" target="_blank" rel="noopener"
+            >tslib (0BSD)</a
+          >,
+          <a href="/pdfjs/cmaps/LICENSE" target="_blank" rel="noopener"
+            >PDF.js CMaps</a
+          >,
+          <a
+            href="/pdfjs/standard_fonts/LICENSE_LIBERATION"
+            target="_blank"
+            rel="noopener"
+            >Liberation Fonts</a
+          >.
+        </li>
+      </ul>
       <form method="dialog">
         <button class="action">Close <span>×</span></button>
       </form>

@@ -1,17 +1,17 @@
-# Gravipress — Engineered to be smaller.
+# Gravipress v1.0 — Engineered to be smaller.
 
-A local-first, client-side PDF compression utility. Uses the approved olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) palette with a mechanical hydraulic press interface synchronized to real compression progress. Built with plain HTML, CSS, JavaScript, `pdf-lib`, `pdfjs-dist`, and Vite.
+A local-first, client-side file compression utility for **PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives**. Uses the approved olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) palette with a mechanical hydraulic press interface synchronized to real compression progress. Built with plain HTML, CSS, JavaScript, `pdf-lib`, `pdfjs-dist`, `upng-js`, `fflate`, and Vite.
 
 ## Run locally
 
 Requires Node.js 18+ (Node 22 recommended) and a modern browser with ES modules, Web Workers, and HTML5 Canvas support.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite. Select a PDF or click **Try sample PDF**, choose a compression preset, and click **Compress PDF**.
+Open the URL printed by Vite. Drop or select a PDF, image, batch of files, or archive folder, choose a preset, and click **Compress**.
 
 ## Build & test
 
@@ -39,7 +39,7 @@ If no smaller valid output can be produced, Gravipress retains the original PDF,
 - **Supported General Files & Folders (ZIP / GZIP)**: Arbitrary files (text, CSV, JSON, XML, source code, documents, binary files) and nested folders (`webkitdirectory` or directory drag-and-drop) compressed in a Web Worker using `fflate`:
   - **ZIP**: `Fast` (DEFLATE level 1), `Balanced` (DEFLATE level 6), `Maximum` (DEFLATE level 9), and `Store only` (level 0). Already-compressed formats (`.zip`, `.jpg`, `.png`, `.docx`, etc.) automatically use `STORE` inside DEFLATE archives to avoid wasted CPU/memory.
   - **GZIP (`.gz`)**: Single-file stream compression (`1f 8b`). Disabled when multiple files or folders are selected.
-- **Not yet supported**: Video (`.mp4`), audio (`.mp3`), `.gif`, and animated images (APNG / animated WebP / animated AVIF).
+- **Supported Formats (v1.0)**: PDF (`.pdf`), raster images (`.jpg`/`.jpeg`, `.png`, `.webp`, `.avif`), batch queues, and lossless ZIP/GZIP archives. (Animated `.gif`/APNG/animated WebP/AVIF are rejected; multimedia codecs are not included in v1.0.)
 - **Image compression methods**:
   - **PNG**: Uses `upng-js` for lossless deflate re-encoding (`Light`) and indexed palette quantization (`Balanced` / `Maximum`) while preserving alpha transparency.
   - **JPEG / WebP / AVIF**: Uses browser-native Canvas encoding (`0.90` / `0.78` / `0.55` defaults), custom quality slider, optional aspect-ratio-preserving max-dimension resizing, and bounded binary-search target size optimization.
@@ -80,17 +80,16 @@ Automated benchmarks measured across realistic, non-repetitive datasets in headl
 
 ## Licenses
 
-- `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), `upng-js` (MIT), `pako` (MIT), `fflate` (MIT).
+- **Application License**: MIT License — see [LICENSE](LICENSE).
+- **Third-Party Runtime Dependencies**: `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), `upng-js` (MIT), `pako` (MIT), `fflate` (MIT), `tslib` (0BSD). See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) and `public/licenses/`.
 
 ## Structure
 
-- `index.html`: Semantic workspace, warnings, metrics, and dialogs
+- `index.html`: Semantic workspace, warnings, metrics, and dialogs (`#licenses-dialog`, `#dialog`)
 - `src/style.css`: Industrial palette, layout, and `--press`-synchronized hydraulic press
 - `src/main.js`: Application orchestration, cancellation, preview, and download flow
-- `src/config/compression-presets.js`: Preset parameters, warnings, and safety limits
-- `src/engines/pdf-loader.js`: Lazy loaders for `pdf-lib` and local `pdfjs-dist` worker
-- `src/engines/pdf-preview.js`: First-page PDF preview renderer and local sample PDF generator
-- `src/engines/pdf-compressor.js`: Real Light, Balanced, and Maximum compression pipelines
-- `src/utils/file-utils.js`: PDF header validation, signature detection, and size/savings math
-- `src/utils/download-utils.js`: Safe PDF Blob download and object URL cleanup
-- `tests/pdf-engine.test.js`: Automated unit and integration tests
+- `src/engines/`: PDF (`pdf-loader.js`, `pdf-preview.js`, `pdf-compressor.js`), image (`image-compressor.js`), batch (`batch-compressor.js`), and archive (`general-compressor.js`, `gzip-compressor.js`) pipelines
+- `src/workers/archive.worker.js`: Off-main-thread ZIP/GZIP worker via `fflate`
+- `vercel.json`: Static security headers and Content Security Policy
+- `THIRD_PARTY_LICENSES.md` & `public/licenses/`: Third-party copyright notices and full license texts
+- `tests/`: Unit tests (`npm test`) and Playwright E2E smoke/audit suites

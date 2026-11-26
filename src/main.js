@@ -1435,11 +1435,15 @@ getElement('enable-resize').onchange = (event) => {
 getElement('start').onclick = startCompression;
 getElement('download').onclick = handleDownload;
 
+getElement('licenses').onclick = () => {
+  getElement('licenses-dialog').showModal();
+};
+
 getElement('about').onclick = () => {
   openDialog(
     'Less space. More room.',
-    'A local-first PDF, image, and batch compression utility. All parsing, ' +
-      'rendering, compression, and ZIP packaging run directly in your browser. Files are never uploaded.'
+    'A local-first PDF, image, batch, and ZIP/GZIP archive compression utility. All parsing, ' +
+      'rendering, compression, and packaging run directly in your browser. Files are never uploaded.'
   );
 };
 
