@@ -57,7 +57,16 @@ RUN tar -xzf /sources/libogg.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 RUN tar -xzf /sources/libvorbis.tar.gz -C /build && \
     cd /build/libvorbis-1.3.7 && \
-    emconfigure ./configure --prefix=$PREFIX --disable-shared --enable-static --with-ogg=$PREFIX && \
+    sed -i 's#-mno-ieee-fp##g' configure.ac && \
+    emconfigure ./configure \
+      --prefix=$PREFIX \
+      --host=i686-linux \
+      --enable-shared=no \
+      --enable-static \
+      --with-ogg=$PREFIX \
+      --enable-docs=no \
+      --enable-examples=no \
+      --disable-oggtest && \
     emmake make -j$(nproc) && \
     emmake make install
 
@@ -66,7 +75,17 @@ RUN tar -xzf /sources/libvorbis.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 RUN tar -xzf /sources/libopus.tar.gz -C /build && \
     cd /build/opus-1.4 && \
-    emconfigure ./configure --prefix=$PREFIX --disable-shared --enable-static --disable-extra-programs && \
+    emconfigure ./configure \
+      --prefix=$PREFIX \
+      --host=i686-none \
+      --enable-shared=no \
+      --enable-static \
+      --disable-asm \
+      --disable-rtcd \
+      --disable-intrinsics \
+      --disable-doc \
+      --disable-extra-programs \
+      --disable-stack-protector && \
     emmake make -j$(nproc) && \
     emmake make install
 
@@ -75,7 +94,14 @@ RUN tar -xzf /sources/libopus.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 RUN tar -xzf /sources/lame.tar.gz -C /build && \
     cd /build/lame-3.100 && \
-    emconfigure ./configure --prefix=$PREFIX --disable-shared --enable-static --disable-frontend && \
+    emconfigure ./configure \
+      --prefix=$PREFIX \
+      --host=i686-linux \
+      --disable-shared \
+      --enable-static \
+      --disable-frontend \
+      --disable-analyzer-hooks \
+      --disable-dependency-tracking && \
     emmake make -j$(nproc) && \
     emmake make install
 
@@ -83,22 +109,37 @@ RUN tar -xzf /sources/lame.tar.gz -C /build && \
 # 6. Build libvpx (VP8/VP9 Video Codecs)
 # -----------------------------------------------------------------------------
 RUN cd /sources/libvpx && \
-    CROSS=x86-linux emconfigure ./configure --prefix=$PREFIX \
+    CROSS=x86-linux emconfigure ./configure \
+      --prefix=$PREFIX \
       --target=generic-gnu \
-      --disable-shared --enable-static \
-      --disable-examples --disable-tools --disable-docs --disable-unit-tests && \
+      --disable-shared \
+      --enable-static \
+      --disable-install-bins \
+      --disable-examples \
+      --disable-tools \
+      --disable-docs \
+      --disable-unit-tests \
+      --disable-dependency-tracking \
+      --disable-multithread \
+      --extra-cflags="$CFLAGS" \
+      --extra-cxxflags="$CXXFLAGS" && \
     emmake make -j$(nproc) && \
-    emmake make install
+    emmake make install && \
+    emranlib $PREFIX/lib/libvpx.a
 
 # -----------------------------------------------------------------------------
 # 7. Build x264 (H.264 Video Codec - GPL)
 # -----------------------------------------------------------------------------
 RUN cd /sources/x264 && \
-    emconfigure ./configure --prefix=$PREFIX \
-      --disable-cli --enable-static --disable-asm \
-      --extra-cflags="-O3 -fPIC" && \
-    emmake make -j$(nproc) && \
-    emmake make install
+    emconfigure ./configure \
+      --prefix=$PREFIX \
+      --host=x86-gnu \
+      --enable-static \
+      --disable-cli \
+      --disable-asm \
+      --disable-thread \
+      --extra-cflags="$CFLAGS" && \
+    emmake make -j$(nproc) install-lib-static
 
 # -----------------------------------------------------------------------------
 # 8. Configure & Build FFmpeg 6.1.6
@@ -109,11 +150,24 @@ RUN cd /sources/ffmpeg && \
       --target-os=none \
       --arch=x86_32 \
       --enable-cross-compile \
-      --disable-x86asm \
+      --disable-asm \
       --disable-inline-asm \
       --disable-stripping \
-      --disable-doc \
       --disable-programs \
+      --disable-doc \
+      --disable-debug \
+      --disable-runtime-cpudetect \
+      --disable-autodetect \
+      --disable-pthreads \
+      --disable-w32threads \
+      --disable-os2threads \
+      --nm=emnm \
+      --ar=emar \
+      --ranlib=emranlib \
+      --cc=emcc \
+      --cxx=em++ \
+      --objcc=emcc \
+      --dep-cc=emcc \
       --disable-all \
       --enable-avcodec \
       --enable-avformat \
@@ -133,8 +187,9 @@ RUN cd /sources/ffmpeg && \
       --enable-parser=h264,vp8,vp9,mpegaudio,vorbis,opus,aac,flac \
       --enable-protocol=file \
       --enable-filter=aresample,scale \
-      --extra-cflags="-I$PREFIX/include" \
-      --extra-ldflags="-L$PREFIX/lib" && \
+      --extra-cflags="$CFLAGS" \
+      --extra-cxxflags="$CXXFLAGS" \
+      --extra-ldflags="$LDFLAGS" && \
     emmake make -j$(nproc)
 
 # -----------------------------------------------------------------------------
