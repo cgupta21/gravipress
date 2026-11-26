@@ -46,9 +46,9 @@ RUN git clone --depth 1 --branch n5.1.10 https://github.com/FFmpeg/FFmpeg.git /s
 RUN git clone https://github.com/ffmpegwasm/x264.git /sources/x264 && \
     cd /sources/x264 && git checkout baee400fa9ced6f5481a728138fed6e867b0ff7f
 
-# Clone libvpx source (pinned tag v1.14.0, verified commit 602e2e8979d111b02c959470da5322797dd96a19)
-RUN git clone --depth 1 --branch v1.14.0 https://github.com/webmproject/libvpx.git /sources/libvpx && \
-    cd /sources/libvpx && test "$(git rev-parse HEAD)" = "602e2e8979d111b02c959470da5322797dd96a19"
+# Clone libvpx source (pinned tag v1.17.0, verified commit 6df3ec34557879fff673706f4a1d9fbd0f3a6f0e)
+RUN git clone --depth 1 --branch v1.17.0 https://github.com/webmproject/libvpx.git /sources/libvpx && \
+    cd /sources/libvpx && test "$(git rev-parse HEAD)" = "6df3ec34557879fff673706f4a1d9fbd0f3a6f0e"
 
 # -----------------------------------------------------------------------------
 # 2. Build libogg (Required by Vorbis)
@@ -213,11 +213,11 @@ RUN cd /sources/ffmpeg && \
       --enable-libopus \
       --enable-encoder=libx264,libvpx_vp8,libvpx_vp9,libmp3lame,libvorbis,libopus,aac,flac,pcm_s16le,pcm_s24le,pcm_s32le \
       --enable-decoder=h264,vp8,vp9,mp3,vorbis,opus,aac,flac,pcm_s16le,pcm_s24le,pcm_s32le \
-      --enable-muxer=mp4,webm,matroska,mp3,ogg,opus,flac,wav,null,s16le,s24le,s32le \
-      --enable-demuxer=mov,mp4,m4a,matroska,webm,mp3,ogg,flac,wav,s16le,s24le,s32le \
+      --enable-muxer=mp4,webm,matroska,mp3,ogg,opus,flac,wav,null,ipod,adts,pcm_s16le,pcm_s24le,pcm_s32le \
+      --enable-demuxer=mov,mp4,m4a,matroska,webm,mp3,ogg,flac,wav,aac,pcm_s16le,pcm_s24le,pcm_s32le \
       --enable-parser=h264,vp8,vp9,mpegaudio,vorbis,opus,aac,flac \
       --enable-protocol=file \
-      --enable-filter=aresample,scale,anull,null,aformat,format,astats \
+      --enable-filter=aresample,scale,anull,null,aformat,format,astats,atrim,trim \
       --extra-cflags="$CFLAGS" \
       --extra-cxxflags="$CXXFLAGS" \
       --extra-ldflags="$LDFLAGS" || { echo "=== FFmpeg config.log ==="; cat ffbuild/config.log 2>/dev/null || cat config.log 2>/dev/null || true; exit 1; }) && \
@@ -264,7 +264,7 @@ License: GNU General Public License v2.0 or later (GPL-2.0-or-later)
 This binary package incorporates software developed by:
 - FFmpeg Project (FFmpeg 5.1.10, GPL-2.0-or-later, https://ffmpeg.org)
 - VideoLAN / x264 contributors (x264 baee400fa9ced6, GPL-2.0-or-later, https://www.videolan.org/developers/x264.html)
-- WebM Project / Google LLC (libvpx 1.14.0, BSD-3-Clause, https://www.webmproject.org/)
+- WebM Project / Google LLC (libvpx 1.17.0, BSD-3-Clause, https://www.webmproject.org/)
 - LAME Project (LAME 3.100, LGPL-2.0-or-later, https://lame.sourceforge.io/)
 - Xiph.Org Foundation (libogg 1.3.5, libvorbis 1.3.7, BSD-3-Clause, https://xiph.org/)
 - Xiph.Org, Skype, Mozilla (libopus 1.4, BSD-3-Clause, https://opus-codec.org/)
@@ -280,8 +280,8 @@ RUN cat <<'EOF' > /dist/manifest.json
   "ffmpegVersion": "n5.1.10",
   "ffmpegCommit": "19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb",
   "x264Commit": "baee400fa9ced6f5481a728138fed6e867b0ff7f",
-  "libvpxTag": "v1.14.0",
-  "libvpxCommit": "602e2e8979d111b02c959470da5322797dd96a19",
+  "libvpxTag": "v1.17.0",
+  "libvpxCommit": "6df3ec34557879fff673706f4a1d9fbd0f3a6f0e",
   "lameVersion": "3.100",
   "liboggVersion": "1.3.5",
   "libvorbisVersion": "1.3.7",
@@ -306,6 +306,37 @@ RUN cat <<'EOF' > /dist/manifest.json
     "pcm_s24le",
     "pcm_s32le"
   ],
+  "enabledMuxers": [
+    "mp4",
+    "webm",
+    "matroska",
+    "mp3",
+    "ogg",
+    "opus",
+    "flac",
+    "wav",
+    "null",
+    "ipod",
+    "adts",
+    "pcm_s16le",
+    "pcm_s24le",
+    "pcm_s32le"
+  ],
+  "enabledDemuxers": [
+    "mov",
+    "mp4",
+    "m4a",
+    "matroska",
+    "webm",
+    "mp3",
+    "ogg",
+    "flac",
+    "wav",
+    "aac",
+    "pcm_s16le",
+    "pcm_s24le",
+    "pcm_s32le"
+  ],
   "enabledFilters": [
     "aresample",
     "scale",
@@ -313,7 +344,9 @@ RUN cat <<'EOF' > /dist/manifest.json
     "null",
     "aformat",
     "format",
-    "astats"
+    "astats",
+    "atrim",
+    "trim"
   ],
   "configureFlags": [
     "--target-os=none",
