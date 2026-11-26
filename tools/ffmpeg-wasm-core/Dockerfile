@@ -57,16 +57,18 @@ RUN tar -xzf /sources/libogg.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 RUN tar -xzf /sources/libvorbis.tar.gz -C /build && \
     cd /build/libvorbis-1.3.7 && \
-    sed -i 's#-mno-ieee-fp##g' configure.ac && \
+    sed -i 's/-mno-ieee-fp//g' configure && \
+    touch configure Makefile.in */Makefile.in && \
     emconfigure ./configure \
       --prefix=$PREFIX \
       --host=i686-linux \
       --enable-shared=no \
       --enable-static \
       --with-ogg=$PREFIX \
-      --enable-docs=no \
-      --enable-examples=no \
+      --disable-docs \
+      --disable-examples \
       --disable-oggtest && \
+    sed -i 's/-mno-ieee-fp//g' lib/Makefile && \
     emmake make -j$(nproc) && \
     emmake make install
 
@@ -200,11 +202,16 @@ RUN cd /sources/ffmpeg && \
     emcc \
       -O3 \
       /build/bind.o \
-      fftools/ffmpeg.o fftools/ffmpeg_opt.o fftools/ffmpeg_filter.o fftools/ffmpeg_mux.o \
+      fftools/cmdutils.c fftools/ffmpeg.c fftools/ffmpeg_filter.c fftools/ffmpeg_hw.c fftools/ffmpeg_mux.c fftools/ffmpeg_opt.c fftools/opt_common.c \
+      -I. \
+      -I./fftools \
+      -I$PREFIX/include \
       -Llibavcodec -Llibavformat -Llibavfilter -Llibswscale -Llibswresample -Llibavutil -L$PREFIX/lib \
       -lavformat -lavcodec -lavfilter -lswscale -lswresample -lavutil \
       -lx264 -lvpx -lmp3lame -lvorbisenc -lvorbis -logg -lopus \
       -sWASM=1 \
+      -sSTACK_SIZE=5MB \
+      -sINITIAL_MEMORY=32MB \
       -sALLOW_MEMORY_GROWTH=1 \
       -sMAXIMUM_MEMORY=2147483648 \
       -sEXPORT_ES6=1 \
@@ -216,6 +223,7 @@ RUN cd /sources/ffmpeg && \
       -sEXIT_RUNTIME=0 \
       --post-js /sources/post.js \
       -lnodefs.js \
+      -lworkerfs.js \
       -o /dist/ffmpeg-core.js
 
 # -----------------------------------------------------------------------------
