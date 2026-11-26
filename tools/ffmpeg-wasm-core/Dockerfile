@@ -6,7 +6,8 @@ FROM emscripten/emsdk:3.1.40@sha256:c1e807a6e03ac5bd5b37bae2ace3c46c08579e2ddeb9
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PREFIX=/opt/ffmpeg-wasm
-ENV PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$EMSDK/upstream/emscripten/system/lib/pkgconfig"
+ENV PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:$EMSDK/upstream/emscripten/system/lib/pkgconfig"
+ENV PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 ENV CFLAGS="-I$PREFIX/include -O3 -fPIC"
 ENV CXXFLAGS="$CFLAGS"
 ENV LDFLAGS="-L$PREFIX/lib"
@@ -144,10 +145,30 @@ RUN cd /sources/x264 && \
     emmake make -j$(nproc) install-lib-static
 
 # -----------------------------------------------------------------------------
+# 7b. Preflight pkg-config & Emscripten Link Diagnostics
+# -----------------------------------------------------------------------------
+RUN echo "PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR" && \
+    echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" && \
+    ls -la $PREFIX/lib/pkgconfig && \
+    for lib in opus vpx x264 ogg vorbis vorbisenc; do \
+      echo "=== pkg-config check: $lib ==="; \
+      pkg-config --modversion "$lib"; \
+      pkg-config --static --cflags --libs "$lib"; \
+    done && \
+    test -f "$PREFIX/include/lame/lame.h" && \
+    test -f "$PREFIX/lib/libmp3lame.a" && \
+    printf '#include <stddef.h>\n#include <opus_multistream.h>\nint main(void) { int err = 0; return opus_multistream_decoder_create(48000, 2, 1, 1, (const unsigned char *)"\\0\\1", &err) != NULL ? 0 : 1; }\n' > /tmp/opus_probe.c && \
+    emcc /tmp/opus_probe.c $(pkg-config --static --cflags --libs opus) -o /tmp/opus_probe.js && \
+    rm -f /tmp/opus_probe.c /tmp/opus_probe.js /tmp/opus_probe.wasm
+
+# -----------------------------------------------------------------------------
 # 8. Configure & Build FFmpeg 6.1.6
 # -----------------------------------------------------------------------------
 RUN cd /sources/ffmpeg && \
-    emconfigure ./configure \
+    (emconfigure env \
+      PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:$EMSDK/upstream/emscripten/system/lib/pkgconfig" \
+      PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
+      ./configure \
       --prefix=$PREFIX \
       --target-os=none \
       --arch=x86_32 \
@@ -170,6 +191,8 @@ RUN cd /sources/ffmpeg && \
       --cxx=em++ \
       --objcc=emcc \
       --dep-cc=emcc \
+      --pkg-config=/usr/bin/pkg-config \
+      --pkg-config-flags=--static \
       --disable-all \
       --enable-avcodec \
       --enable-avformat \
@@ -191,7 +214,7 @@ RUN cd /sources/ffmpeg && \
       --enable-filter=aresample,scale \
       --extra-cflags="$CFLAGS" \
       --extra-cxxflags="$CXXFLAGS" \
-      --extra-ldflags="$LDFLAGS" && \
+      --extra-ldflags="$LDFLAGS" || { echo "=== FFmpeg config.log ==="; cat ffbuild/config.log 2>/dev/null || cat config.log 2>/dev/null || true; exit 1; }) && \
     emmake make -j$(nproc)
 
 # -----------------------------------------------------------------------------
