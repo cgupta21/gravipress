@@ -2,8 +2,12 @@
 """
 Patch FFmpeg 5.1.10 frontend sources for WebAssembly execution:
 1. cmdutils.c: Hook exit_program to uninit_opts, set Module.ret, Module._cleanExit, and abort() cleanly.
-2. ffprobe.c: Avoid duplicate symbols (program_name_ffprobe), reset state in ffprobe_cleanup(), export int ffprobe(int argc, char **argv).
-3. ffmpeg.c: Export int ffmpeg(int argc, char **argv), add init_globals() for re-entrancy, hook send_progress() and check_timeout().
+              Add unified show_help_default dispatcher resolving frontend symbol collision.
+2. ffprobe.c: Avoid duplicate symbols (program_name_ffprobe, show_help_default_ffprobe),
+              reset state in ffprobe_cleanup(), export int ffprobe(int argc, char **argv).
+3. ffmpeg_opt.c: Rename show_help_default to show_help_default_ffmpeg.
+4. ffmpeg.c: Export int ffmpeg(int argc, char **argv), add init_globals() for re-entrancy,
+             hook send_progress() and check_timeout().
 """
 import os
 import sys
@@ -38,6 +42,18 @@ void exit_program(int ret)
         Module._cleanExit = true;
     }, ret);
     abort();
+}
+
+extern void show_help_default_ffmpeg(const char *opt, const char *arg);
+extern void show_help_default_ffprobe(const char *opt, const char *arg);
+int current_is_ffprobe = 0;
+
+void show_help_default(const char *opt, const char *arg)
+{
+    if (current_is_ffprobe)
+        show_help_default_ffprobe(opt, arg);
+    else
+        show_help_default_ffmpeg(opt, arg);
 }"""
 
 if old_exit in cmd:
@@ -63,6 +79,9 @@ probe = probe.replace('program_birth_year,', 'program_birth_year_ffprobe,')
 probe = probe.replace('program_birth_year ', 'program_birth_year_ffprobe ')
 probe = probe.replace('program_birth_year)', 'program_birth_year_ffprobe)')
 
+# Resolve duplicate show_help_default symbol
+probe = probe.replace('void show_help_default(const char *opt, const char *arg)', 'void show_help_default_ffprobe(const char *opt, const char *arg)')
+
 old_cleanup = """static void ffprobe_cleanup(int ret)
 {
     int i;
@@ -77,6 +96,9 @@ old_cleanup = """static void ffprobe_cleanup(int ret)
 new_cleanup = """static void ffprobe_cleanup(int ret)
 {
     int i;
+    extern int current_is_ffprobe;
+    current_is_ffprobe = 0;
+
     for (i = 0; i < FF_ARRAY_ELEMS(sections); i++)
         av_dict_free(&(sections[i].entries_to_show));
 
@@ -142,6 +164,8 @@ else:
 old_probe_main = 'int main(int argc, char **argv)\n{'
 new_probe_main = """int ffprobe(int argc, char **argv)
 {
+    extern int current_is_ffprobe;
+    current_is_ffprobe = 1;
     ffprobe_cleanup(0);"""
 
 if old_probe_main in probe:
@@ -151,7 +175,23 @@ with open(probe_path, "w", encoding="utf-8") as f:
     f.write(probe)
 print("ffprobe.c patched successfully")
 
-# 3. Patch ffmpeg.c
+# 3. Patch ffmpeg_opt.c
+opt_path = os.path.join(fftools, "ffmpeg_opt.c")
+with open(opt_path, "r", encoding="utf-8") as f:
+    opt = f.read().replace("\r\n", "\n")
+
+old_opt_help = "void show_help_default(const char *opt, const char *arg)"
+new_opt_help = "void show_help_default_ffmpeg(const char *opt, const char *arg)"
+
+if old_opt_help in opt:
+    opt = opt.replace(old_opt_help, new_opt_help)
+    with open(opt_path, "w", encoding="utf-8") as f:
+        f.write(opt)
+    print("ffmpeg_opt.c patched successfully")
+else:
+    print("WARNING: old_opt_help pattern not found in ffmpeg_opt.c")
+
+# 4. Patch ffmpeg.c
 ff_path = os.path.join(fftools, "ffmpeg.c")
 with open(ff_path, "r", encoding="utf-8") as f:
     ff = f.read().replace("\r\n", "\n")
@@ -181,6 +221,9 @@ else:
 
 old_ff_main = 'int main(int argc, char **argv)\n{'
 new_ff_main = """void init_globals(void) {
+  extern int current_is_ffprobe;
+  current_is_ffprobe = 0;
+
   nb_frames_dup = 0;
   dup_warning = 1000;
   nb_frames_drop = 0;
