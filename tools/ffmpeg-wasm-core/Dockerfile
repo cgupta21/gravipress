@@ -50,16 +50,10 @@ RUN git clone https://github.com/ffmpegwasm/x264.git /sources/x264 && \
 RUN git clone --depth 1 --branch v1.14.0 https://github.com/webmproject/libvpx.git /sources/libvpx && \
     cd /sources/libvpx && test "$(git rev-parse HEAD)" = "602e2e8979d111b02c959470da5322797dd96a19"
 
-# Extract codec source trees into /sources for complete corresponding-source packaging
-RUN tar -xzf /sources/libogg.tar.gz -C /sources && \
-    tar -xzf /sources/libvorbis.tar.gz -C /sources && \
-    tar -xzf /sources/libopus.tar.gz -C /sources && \
-    tar -xzf /sources/lame.tar.gz -C /sources
-
 # -----------------------------------------------------------------------------
 # 2. Build libogg (Required by Vorbis)
 # -----------------------------------------------------------------------------
-RUN cp -r /sources/libogg-1.3.5 /build/libogg-1.3.5 && \
+RUN tar -xzf /sources/libogg.tar.gz -C /build && \
     cd /build/libogg-1.3.5 && \
     emconfigure ./configure --prefix=$PREFIX --disable-shared --enable-static && \
     emmake make -j$(nproc) && \
@@ -68,7 +62,7 @@ RUN cp -r /sources/libogg-1.3.5 /build/libogg-1.3.5 && \
 # -----------------------------------------------------------------------------
 # 3. Build libvorbis (Ogg Vorbis Audio Codec)
 # -----------------------------------------------------------------------------
-RUN cp -r /sources/libvorbis-1.3.7 /build/libvorbis-1.3.7 && \
+RUN tar -xzf /sources/libvorbis.tar.gz -C /build && \
     cd /build/libvorbis-1.3.7 && \
     sed -i 's/-mno-ieee-fp//g' configure && \
     touch configure Makefile.in */Makefile.in && \
@@ -88,7 +82,7 @@ RUN cp -r /sources/libvorbis-1.3.7 /build/libvorbis-1.3.7 && \
 # -----------------------------------------------------------------------------
 # 4. Build libopus (Opus Audio Codec)
 # -----------------------------------------------------------------------------
-RUN cp -r /sources/opus-1.4 /build/opus-1.4 && \
+RUN tar -xzf /sources/libopus.tar.gz -C /build && \
     cd /build/opus-1.4 && \
     emconfigure ./configure \
       --prefix=$PREFIX \
@@ -107,7 +101,7 @@ RUN cp -r /sources/opus-1.4 /build/opus-1.4 && \
 # -----------------------------------------------------------------------------
 # 5. Build libmp3lame (MP3 Audio Codec)
 # -----------------------------------------------------------------------------
-RUN cp -r /sources/lame-3.100 /build/lame-3.100 && \
+RUN tar -xzf /sources/lame.tar.gz -C /build && \
     cd /build/lame-3.100 && \
     emconfigure ./configure \
       --prefix=$PREFIX \
@@ -367,10 +361,16 @@ RUN mkdir -p /sources/LICENSES && \
     cp /sources/ffmpeg/COPYING.LGPLv2.1 /sources/LICENSES/LGPL-2.1.txt 2>/dev/null || true && \
     cp /sources/x264/COPYING /sources/LICENSES/x264-GPL.txt 2>/dev/null || true && \
     cp /sources/libvpx/LICENSE /sources/LICENSES/libvpx-BSD.txt 2>/dev/null || true && \
-    cp /sources/lame-3.100/COPYING /sources/LICENSES/lame-LGPL.txt 2>/dev/null || true && \
-    cp /sources/libogg-1.3.5/COPYING /sources/LICENSES/libogg-BSD.txt 2>/dev/null || true && \
-    cp /sources/libvorbis-1.3.7/COPYING /sources/LICENSES/libvorbis-BSD.txt 2>/dev/null || true && \
-    cp /sources/opus-1.4/COPYING /sources/LICENSES/libopus-BSD.txt 2>/dev/null || true
+    cp /build/lame-3.100/COPYING /sources/LICENSES/lame-LGPL.txt 2>/dev/null || true && \
+    cp /build/libogg-1.3.5/COPYING /sources/LICENSES/libogg-BSD.txt 2>/dev/null || true && \
+    cp /build/libvorbis-1.3.7/COPYING /sources/LICENSES/libvorbis-BSD.txt 2>/dev/null || true && \
+    cp /build/opus-1.4/COPYING /sources/LICENSES/libopus-BSD.txt 2>/dev/null || true
+
+# Extract unpacked codec source trees into /sources for corresponding-source completeness
+RUN tar -xzf /sources/libogg.tar.gz -C /sources && \
+    tar -xzf /sources/libvorbis.tar.gz -C /sources && \
+    tar -xzf /sources/libopus.tar.gz -C /sources && \
+    tar -xzf /sources/lame.tar.gz -C /sources
 
 # Copy Docker build script & instructions into corresponding-source archive
 COPY Dockerfile README.md build-custom-ffmpeg.yml* /sources/build-scripts/
