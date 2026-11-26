@@ -22,7 +22,7 @@ WORKDIR /sources
 # -----------------------------------------------------------------------------
 # 1. Download & Verify All Pinned Source Tarballs via SHA-256 Checksums
 # -----------------------------------------------------------------------------
-COPY sources.env bind.c post.js /sources/
+COPY sources.env patch-wasm.py post.js /sources/
 
 RUN curl -fsSL -o /sources/lame.tar.gz https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
     curl -fsSL -o /sources/libogg.tar.gz https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.gz && \
@@ -36,19 +36,30 @@ RUN curl -fsSL -o /sources/lame.tar.gz https://downloads.sourceforge.net/project
 
 # Clone FFmpeg 5.1.10 LTS source (pinned tag n5.1.10, verified commit 19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb)
 RUN git clone --depth 1 --branch n5.1.10 https://github.com/FFmpeg/FFmpeg.git /sources/ffmpeg && \
-    cd /sources/ffmpeg && test "$(git rev-parse HEAD)" = "19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb"
+    cd /sources/ffmpeg && test "$(git rev-parse HEAD)" = "19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb" && \
+    python3 /sources/patch-wasm.py /sources/ffmpeg && \
+    mkdir -p /sources/patches && \
+    git diff > /sources/patches/ffmpeg-5.1.10-wasm.patch && \
+    cp /sources/patch-wasm.py /sources/patches/
 
 # Clone x264 from verified GitHub mirror and checkout exact pinned commit
 RUN git clone https://github.com/ffmpegwasm/x264.git /sources/x264 && \
     cd /sources/x264 && git checkout baee400fa9ced6f5481a728138fed6e867b0ff7f
 
-# Clone libvpx source (pinned tag v1.14.0)
-RUN git clone --depth 1 --branch v1.14.0 https://github.com/webmproject/libvpx.git /sources/libvpx
+# Clone libvpx source (pinned tag v1.14.0, verified commit 602e2e8979d111b02c959470da5322797dd96a19)
+RUN git clone --depth 1 --branch v1.14.0 https://github.com/webmproject/libvpx.git /sources/libvpx && \
+    cd /sources/libvpx && test "$(git rev-parse HEAD)" = "602e2e8979d111b02c959470da5322797dd96a19"
+
+# Extract codec source trees into /sources for complete corresponding-source packaging
+RUN tar -xzf /sources/libogg.tar.gz -C /sources && \
+    tar -xzf /sources/libvorbis.tar.gz -C /sources && \
+    tar -xzf /sources/libopus.tar.gz -C /sources && \
+    tar -xzf /sources/lame.tar.gz -C /sources
 
 # -----------------------------------------------------------------------------
 # 2. Build libogg (Required by Vorbis)
 # -----------------------------------------------------------------------------
-RUN tar -xzf /sources/libogg.tar.gz -C /build && \
+RUN cp -r /sources/libogg-1.3.5 /build/libogg-1.3.5 && \
     cd /build/libogg-1.3.5 && \
     emconfigure ./configure --prefix=$PREFIX --disable-shared --enable-static && \
     emmake make -j$(nproc) && \
@@ -57,7 +68,7 @@ RUN tar -xzf /sources/libogg.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 # 3. Build libvorbis (Ogg Vorbis Audio Codec)
 # -----------------------------------------------------------------------------
-RUN tar -xzf /sources/libvorbis.tar.gz -C /build && \
+RUN cp -r /sources/libvorbis-1.3.7 /build/libvorbis-1.3.7 && \
     cd /build/libvorbis-1.3.7 && \
     sed -i 's/-mno-ieee-fp//g' configure && \
     touch configure Makefile.in */Makefile.in && \
@@ -77,7 +88,7 @@ RUN tar -xzf /sources/libvorbis.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 # 4. Build libopus (Opus Audio Codec)
 # -----------------------------------------------------------------------------
-RUN tar -xzf /sources/libopus.tar.gz -C /build && \
+RUN cp -r /sources/opus-1.4 /build/opus-1.4 && \
     cd /build/opus-1.4 && \
     emconfigure ./configure \
       --prefix=$PREFIX \
@@ -96,7 +107,7 @@ RUN tar -xzf /sources/libopus.tar.gz -C /build && \
 # -----------------------------------------------------------------------------
 # 5. Build libmp3lame (MP3 Audio Codec)
 # -----------------------------------------------------------------------------
-RUN tar -xzf /sources/lame.tar.gz -C /build && \
+RUN cp -r /sources/lame-3.100 /build/lame-3.100 && \
     cd /build/lame-3.100 && \
     emconfigure ./configure \
       --prefix=$PREFIX \
@@ -208,11 +219,11 @@ RUN cd /sources/ffmpeg && \
       --enable-libopus \
       --enable-encoder=libx264,libvpx_vp8,libvpx_vp9,libmp3lame,libvorbis,libopus,aac,flac,pcm_s16le,pcm_s24le,pcm_s32le \
       --enable-decoder=h264,vp8,vp9,mp3,vorbis,opus,aac,flac,pcm_s16le,pcm_s24le,pcm_s32le \
-      --enable-muxer=mp4,webm,matroska,mp3,ogg,opus,flac,wav \
-      --enable-demuxer=mov,mp4,m4a,matroska,webm,mp3,ogg,flac,wav \
+      --enable-muxer=mp4,webm,matroska,mp3,ogg,opus,flac,wav,null,s16le,s24le,s32le \
+      --enable-demuxer=mov,mp4,m4a,matroska,webm,mp3,ogg,flac,wav,s16le,s24le,s32le \
       --enable-parser=h264,vp8,vp9,mpegaudio,vorbis,opus,aac,flac \
       --enable-protocol=file \
-      --enable-filter=aresample,scale \
+      --enable-filter=aresample,scale,anull,null,aformat,format,astats \
       --extra-cflags="$CFLAGS" \
       --extra-cxxflags="$CXXFLAGS" \
       --extra-ldflags="$LDFLAGS" || { echo "=== FFmpeg config.log ==="; cat ffbuild/config.log 2>/dev/null || cat config.log 2>/dev/null || true; exit 1; }) && \
@@ -222,11 +233,9 @@ RUN cd /sources/ffmpeg && \
 # 9. Link Single-Thread ESM WebAssembly Core with API Bindings & Post-JS Glue
 # -----------------------------------------------------------------------------
 RUN cd /sources/ffmpeg && \
-    emcc -O3 -c /sources/bind.c -o /build/bind.o && \
     emcc \
       -O3 \
-      /build/bind.o \
-      fftools/cmdutils.c fftools/ffmpeg.c fftools/ffmpeg_filter.c fftools/ffmpeg_hw.c fftools/ffmpeg_mux.c fftools/ffmpeg_opt.c fftools/opt_common.c \
+      fftools/cmdutils.c fftools/ffmpeg.c fftools/ffmpeg_filter.c fftools/ffmpeg_hw.c fftools/ffmpeg_mux.c fftools/ffmpeg_opt.c fftools/opt_common.c fftools/ffprobe.c \
       -I. \
       -I./fftools \
       -I$PREFIX/include \
@@ -241,8 +250,8 @@ RUN cd /sources/ffmpeg && \
       -sEXPORT_ES6=1 \
       -sMODULARIZE=1 \
       -sEXPORT_NAME=createFFmpegCore \
-      -sEXPORTED_FUNCTIONS="['_ffmpeg', '_ffprobe', '_main', '_malloc', '_free']" \
-      -sEXPORTED_RUNTIME_METHODS="['FS', 'cwrap', 'setValue', 'getValue', 'UTF8ToString', 'stringToUTF8', 'lengthBytesUTF8']" \
+      -sEXPORTED_FUNCTIONS="['_ffmpeg', '_ffprobe', '_malloc', '_free']" \
+      -sEXPORTED_RUNTIME_METHODS="['FS', 'cwrap', 'setValue', 'getValue', 'UTF8ToString', 'stringToUTF8', 'lengthBytesUTF8', 'stackSave', 'stackRestore']" \
       -sINVOKE_RUN=0 \
       -sEXIT_RUNTIME=0 \
       --post-js /sources/post.js \
@@ -274,9 +283,20 @@ RUN cat <<'EOF' > /dist/manifest.json
   "name": "gravipress-ffmpeg-core",
   "version": "5.1.10",
   "ffmpegVersion": "n5.1.10",
+  "ffmpegCommit": "19feb712f5c1821d8a3fa1ad63c5bd2e3b9672eb",
+  "x264Commit": "baee400fa9ced6f5481a728138fed6e867b0ff7f",
+  "libvpxTag": "v1.14.0",
+  "libvpxCommit": "602e2e8979d111b02c959470da5322797dd96a19",
+  "lameVersion": "3.100",
+  "liboggVersion": "1.3.5",
+  "libvorbisVersion": "1.3.7",
+  "libopusVersion": "1.4",
+  "toolchain": {
+    "emscripten": "3.1.40",
+    "emsdkImage": "emscripten/emsdk:3.1.40@sha256:c1e807a6e03ac5bd5b37bae2ace3c46c08579e2ddeb951037a3b8dac7067f2cc"
+  },
   "threading": "single-thread",
   "license": "GPL-2.0-or-later",
-  "emscriptenVersion": "3.1.40",
   "buildDate": "2026-11-26",
   "enabledCodecs": [
     "h264 (libx264)",
@@ -285,11 +305,48 @@ RUN cat <<'EOF' > /dist/manifest.json
     "mp3 (libmp3lame)",
     "aac (native)",
     "vorbis (libvorbis)",
-    "opus (libopus)",
+    "opus (libopus mono)",
     "flac (native)",
     "pcm_s16le",
     "pcm_s24le",
     "pcm_s32le"
+  ],
+  "enabledFilters": [
+    "aresample",
+    "scale",
+    "anull",
+    "null",
+    "aformat",
+    "format",
+    "astats"
+  ],
+  "configureFlags": [
+    "--target-os=none",
+    "--arch=x86_32",
+    "--enable-cross-compile",
+    "--disable-asm",
+    "--disable-inline-asm",
+    "--disable-stripping",
+    "--disable-programs",
+    "--disable-doc",
+    "--disable-debug",
+    "--disable-runtime-cpudetect",
+    "--disable-autodetect",
+    "--disable-pthreads",
+    "--disable-w32threads",
+    "--disable-os2threads",
+    "--disable-all",
+    "--enable-avcodec",
+    "--enable-avformat",
+    "--enable-avfilter",
+    "--enable-swresample",
+    "--enable-swscale",
+    "--enable-gpl",
+    "--enable-libx264",
+    "--enable-libvpx",
+    "--enable-libmp3lame",
+    "--enable-libvorbis",
+    "--enable-libopus"
   ],
   "apis": [
     "exec",
@@ -298,13 +355,54 @@ RUN cat <<'EOF' > /dist/manifest.json
     "setLogger",
     "setTimeout",
     "setProgress",
+    "isCorrupted",
     "FS"
   ]
 }
 EOF
 
+# Copy licenses into /sources/LICENSES/
+RUN mkdir -p /sources/LICENSES && \
+    cp /sources/ffmpeg/COPYING.GPLv2 /sources/LICENSES/GPL-2.0.txt 2>/dev/null || true && \
+    cp /sources/ffmpeg/COPYING.LGPLv2.1 /sources/LICENSES/LGPL-2.1.txt 2>/dev/null || true && \
+    cp /sources/x264/COPYING /sources/LICENSES/x264-GPL.txt 2>/dev/null || true && \
+    cp /sources/libvpx/LICENSE /sources/LICENSES/libvpx-BSD.txt 2>/dev/null || true && \
+    cp /sources/lame-3.100/COPYING /sources/LICENSES/lame-LGPL.txt 2>/dev/null || true && \
+    cp /sources/libogg-1.3.5/COPYING /sources/LICENSES/libogg-BSD.txt 2>/dev/null || true && \
+    cp /sources/libvorbis-1.3.7/COPYING /sources/LICENSES/libvorbis-BSD.txt 2>/dev/null || true && \
+    cp /sources/opus-1.4/COPYING /sources/LICENSES/libopus-BSD.txt 2>/dev/null || true
+
+# Copy Docker build script & instructions into corresponding-source archive
+COPY Dockerfile README.md build-custom-ffmpeg.yml* /sources/build-scripts/
+RUN cp /sources/sources.env /sources/build-scripts/
+
 # Package corresponding source archive
 RUN tar -czf /dist/ffmpeg-corresponding-source-5.1.10.tar.gz -C /sources .
+
+# In-container verification of corresponding source archive completeness
+RUN tar -ztvf /dist/ffmpeg-corresponding-source-5.1.10.tar.gz > /tmp/archive_contents.txt && \
+    for req in \
+      "ffmpeg/fftools/ffmpeg.c" \
+      "ffmpeg/fftools/ffprobe.c" \
+      "ffmpeg/fftools/cmdutils.c" \
+      "x264/x264.h" \
+      "libvpx/vpx/vpx_codec.h" \
+      "lame.tar.gz" \
+      "libogg.tar.gz" \
+      "libvorbis.tar.gz" \
+      "libopus.tar.gz" \
+      "checksums.txt" \
+      "sources.env" \
+      "patch-wasm.py" \
+      "post.js" \
+      "build-scripts/Dockerfile" \
+      "build-scripts/build-custom-ffmpeg.yml" \
+      "build-scripts/README.md" \
+      "LICENSES/GPL-2.0.txt" \
+      "patches/ffmpeg-5.1.10-wasm.patch"; do \
+      grep "$req" /tmp/archive_contents.txt >/dev/null || { echo "FATAL: $req missing from source archive"; exit 1; }; \
+    done && \
+    echo "Corresponding source archive contents verified successfully."
 
 # Compute Cryptographic SHA-256 Checksums
 WORKDIR /dist

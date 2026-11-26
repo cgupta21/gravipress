@@ -29,6 +29,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Stage build workflow for packaging
+        run: |
+          cp .github/workflows/build-custom-ffmpeg.yml tools/ffmpeg-wasm-core/build-custom-ffmpeg.yml
+
       - name: Build WebAssembly Core & Package Corresponding Source
         run: |
           mkdir -p output-dist
@@ -48,6 +52,37 @@ jobs:
           echo ""
           echo "=== MANIFEST ==="
           cat manifest.json
+
+      - name: Verify Corresponding Source Archive Completeness
+        run: |
+          echo "=== VERIFYING CORRESPONDING SOURCE ARCHIVE CONTENTS ==="
+          tar -ztvf output-dist/ffmpeg-corresponding-source-5.1.10.tar.gz > /tmp/archive_contents.txt
+          for req in \
+            "ffmpeg/fftools/ffmpeg.c" \
+            "ffmpeg/fftools/ffprobe.c" \
+            "ffmpeg/fftools/cmdutils.c" \
+            "x264/x264.h" \
+            "libvpx/vpx/vpx_codec.h" \
+            "lame.tar.gz" \
+            "libogg.tar.gz" \
+            "libvorbis.tar.gz" \
+            "libopus.tar.gz" \
+            "checksums.txt" \
+            "sources.env" \
+            "patch-wasm.py" \
+            "post.js" \
+            "build-scripts/Dockerfile" \
+            "build-scripts/build-custom-ffmpeg.yml" \
+            "build-scripts/README.md" \
+            "LICENSES/GPL-2.0.txt" \
+            "patches/ffmpeg-5.1.10-wasm.patch"; do
+            if ! grep -q "$req" /tmp/archive_contents.txt; then
+              echo "ERROR: Missing required corresponding-source entry: $req"
+              exit 1
+            fi
+            echo " Verified: $req"
+          done
+          echo "All required corresponding-source files are verified present."
 
       - name: Generate GitHub Workflow Summary
         run: |
