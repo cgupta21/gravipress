@@ -380,11 +380,19 @@ legend {
   justify-content: space-between;
   align-items: center;
   background: var(--yellow);
+  color: #111111;
   border: 1px solid var(--olive);
   padding: 16px 18px;
   font-weight: 700;
   font-size: 15px;
   gap: 8px;
+}
+
+.action:hover,
+.action:active,
+.action:focus,
+.action:focus-visible {
+  color: #111111;
 }
 
 .action:hover {
@@ -394,6 +402,11 @@ legend {
 .action:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.action span,
+.action span:last-child {
+  color: inherit;
 }
 
 .action span:last-child {
@@ -873,6 +886,14 @@ legend {
 
 .result .action {
   margin-top: 14px;
+  color: #111111;
+}
+
+.result .action:hover,
+.result .action:active,
+.result .action:focus,
+.result .action:focus-visible {
+  color: #111111;
 }
 
 /* ==========================================================================
