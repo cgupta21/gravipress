@@ -215,6 +215,7 @@ test.describe('Phase 8: Gravipress v1.0 Non-Multimedia Release Smoke', () => {
     expect(hdrs['x-content-type-options']).toBe('nosniff');
     expect(hdrs['x-frame-options']).toBe('DENY');
     expect(hdrs['referrer-policy']).toBe('no-referrer');
+    expect(hdrs['permissions-policy']).toBe('camera=(), microphone=(), geolocation=()');
 
     await page.locator('#licenses').click();
     await expect(page.locator('#licenses-dialog')).toBeVisible();

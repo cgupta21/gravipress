@@ -22,7 +22,7 @@ npm run build
 npm run preview
 ```
 
-Deploy `dist/` to any static host. On Vercel select Vite, build command `npm run build`, output directory `dist`.
+Deploy `dist/` to any static host. On Cloudflare Pages, connect the repository, set the framework preset to **Vite** (or **None**), build command `npm run build`, build output directory `dist`, and environment variable `NODE_VERSION=22`. Security headers and Content Security Policy are configured in `public/_headers`.
 
 ## Compression methods
 
@@ -90,6 +90,6 @@ Automated benchmarks measured across realistic, non-repetitive datasets in headl
 - `src/main.js`: Application orchestration, cancellation, preview, and download flow
 - `src/engines/`: PDF (`pdf-loader.js`, `pdf-preview.js`, `pdf-compressor.js`), image (`image-compressor.js`), batch (`batch-compressor.js`), and archive (`general-compressor.js`, `gzip-compressor.js`) pipelines
 - `src/workers/archive.worker.js`: Off-main-thread ZIP/GZIP worker via `fflate`
-- `vercel.json`: Static security headers and Content Security Policy
+- `public/_headers`: Cloudflare Pages security headers and Content Security Policy
 - `THIRD_PARTY_LICENSES.md` & `public/licenses/`: Third-party copyright notices and full license texts
 - `tests/`: Unit tests (`npm test`) and Playwright E2E smoke/audit suites

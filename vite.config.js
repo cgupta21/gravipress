@@ -24,6 +24,28 @@ function serveStaticDir(middlewares, mountPath, sourceDir) {
   });
 }
 
+function parseCloudflareHeaders(content) {
+  const rules = [];
+  let current = null;
+  for (const rawLine of content.split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!/^\s/.test(rawLine)) {
+      current = { path: trimmed, headers: [] };
+      rules.push(current);
+    } else if (current) {
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx > 0) {
+        current.headers.push({
+          key: trimmed.slice(0, colonIdx).trim(),
+          value: trimmed.slice(colonIdx + 1).trim(),
+        });
+      }
+    }
+  }
+  return rules;
+}
+
 function pdfjsAssetsPlugin() {
   const assetDirs = ['cmaps', 'standard_fonts'];
 
@@ -39,14 +61,16 @@ function pdfjsAssetsPlugin() {
       }
     },
     configurePreviewServer(server) {
-      const vercelPath = path.join(rootDir, 'vercel.json');
-      if (fs.existsSync(vercelPath)) {
-        const cfg = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
-        const headers = cfg.headers?.[0]?.headers || [];
-        server.middlewares.use((_req, res, next) => {
-          for (const h of headers) res.setHeader(h.key, h.value);
-          next();
-        });
+      const headersPath = path.join(rootDir, 'public', '_headers');
+      if (fs.existsSync(headersPath)) {
+        const rules = parseCloudflareHeaders(fs.readFileSync(headersPath, 'utf8'));
+        const globalHeaders = rules.find((r) => r.path === '/*')?.headers || [];
+        if (globalHeaders.length > 0) {
+          server.middlewares.use((_req, res, next) => {
+            for (const h of globalHeaders) res.setHeader(h.key, h.value);
+            next();
+          });
+        }
       }
     },
     writeBundle(options) {
