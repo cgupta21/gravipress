@@ -156,8 +156,10 @@ ff_path = os.path.join(fftools, "ffmpeg.c")
 with open(ff_path, "r", encoding="utf-8") as f:
     ff = f.read().replace("\r\n", "\n")
 
-old_ff_main = 'int main(int argc, char **argv)\n{'
-new_ff_main = """#include <emscripten.h>
+# Move EM_JS definitions to top of ffmpeg.c before print_report()
+old_inc = '#include "cmdutils.h"'
+new_inc = """#include "cmdutils.h"
+#include <emscripten.h>
 
 EM_JS(void, send_progress, (double progress, double time), {
     Module.receiveProgress(progress, time);
@@ -170,9 +172,15 @@ EM_JS(int, check_timeout, (void), {
         }
     }
     return 0;
-});
+});"""
 
-void init_globals(void) {
+if old_inc in ff:
+    ff = ff.replace(old_inc, new_inc, 1)
+else:
+    print("WARNING: old_inc pattern not found in ffmpeg.c")
+
+old_ff_main = 'int main(int argc, char **argv)\n{'
+new_ff_main = """void init_globals(void) {
   nb_frames_dup = 0;
   dup_warning = 1000;
   nb_frames_drop = 0;
