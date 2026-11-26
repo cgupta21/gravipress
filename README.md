@@ -1,97 +1,216 @@
-# Gravipress v1.0 — Engineered to be smaller.
+<div align="center">
 
-**Live app:** [https://gravipress.pages.dev](https://gravipress.pages.dev)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/brand/logo-horizontal-light.png" />
+  <source media="(prefers-color-scheme: light)" srcset="public/brand/logo-horizontal-dark.png" />
+  <img alt="Gravipress" src="public/brand/logo-horizontal-dark.png" width="260" />
+</picture>
 
-A local-first, client-side file compression utility for **PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives**. Uses the approved olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) palette with a mechanical hydraulic press interface synchronized to real compression progress. Built with plain HTML, CSS, JavaScript, `pdf-lib`, `pdfjs-dist`, `upng-js`, `fflate`, and Vite.
+# Gravipress
 
-## Run locally
+**Engineered to be smaller.**
 
-Requires Node.js 18+ (Node 22 recommended) and a modern browser with ES modules, Web Workers, and HTML5 Canvas support.
+Privacy-first file compression, directly in your browser.
 
-```sh
+[![Version](https://img.shields.io/badge/production-v1.0-ffc93c?labelColor=2b2d21)](https://gravipress.pages.dev/)
+[![License](https://img.shields.io/badge/license-MIT-d9dadc?labelColor=2b2d21)](LICENSE)
+[![Privacy](https://img.shields.io/badge/privacy-local--first-2b2d21?labelColor=1c1e17)](https://gravipress.pages.dev/)
+[![Hosting](https://img.shields.io/badge/hosting-Cloudflare%20Pages-ffc93c?labelColor=2b2d21)](https://gravipress.pages.dev/)
+
+[**Launch Gravipress**](https://gravipress.pages.dev/) · [Report an issue](https://github.com/cgupta21/gravipress/issues) · [Source code](https://github.com/cgupta21/gravipress)
+
+</div>
+
+## Overview
+
+Gravipress is a browser-based file compression toolkit for PDF documents, raster images, batch queues, and lossless archives. Its industrial olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) hydraulic-press interface connects visual feedback with real compression progress. File processing takes place locally on the user's device, without an application server, account, or remote file storage.
+
+## Features
+
+| Capability         | Production v1.0                                                          |
+| ------------------ | ------------------------------------------------------------------------ |
+| PDF compression    | Structural optimization and adaptive image-based compression             |
+| Image optimization | Quality controls, aspect-ratio resizing, and target-size optimization    |
+| Batch processing   | Up to 20 files (100 MB combined), with progress, cancellation, and retry |
+| ZIP archives       | Files and nested folders with configurable DEFLATE compression levels    |
+| GZIP               | Single-file `.gz` stream compression                                     |
+| Local processing   | 100% browser-side execution and direct local downloads                   |
+
+Audio and video compression are separate development initiatives and are **not** included in production v1.0 (`release/v1.0-non-multimedia`).
+
+## Supported formats
+
+| Tool   | Formats                                                                        |
+| ------ | ------------------------------------------------------------------------------ |
+| PDF    | `.pdf`                                                                         |
+| Images | `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif` (browser-dependent encoding support) |
+| ZIP    | General files and nested folders; `.zip` output                                |
+| GZIP   | Single file; `.gz` output                                                      |
+
+Animated image optimization (animated GIF/APNG/animated WebP/AVIF) and standalone multimedia transcoding are not supported in production v1.0. Multimedia files may still be packaged as ordinary files inside ZIP or GZIP archives.
+
+## Compression methods
+
+| Preset   | PDF                                                                                                   | Images                                                                       |
+| -------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Light    | Structure-only optimization (`pdf-lib` object streams)                                                | Conservative quality settings (`0.90`); lossless PNG re-encoding (`upng-js`) |
+| Balanced | Structural optimization first, then ~144 DPI (`0.75` JPEG) with bounded adaptive fallback when needed | Balanced encoding quality (`0.78`) and PNG palette quantization              |
+| Maximum  | Structural optimization first, then ~96 DPI (`0.50` JPEG) with bounded adaptive fallback when needed  | Aggressive quality (`0.55`) and palette reduction                            |
+
+The PDF engine compares valid candidates and retains the original file when no smaller valid output is produced. Image target-size mode uses bounded adaptive search (`6` attempts max) and is best-effort rather than guaranteed. ZIP offers **Store only** (`0`), **Fast** (`1`), **Balanced** (`6`), and **Maximum** (`9`) DEFLATE levels via `fflate`.
+
+## Performance
+
+Selected historical archive benchmarks using Maximum ZIP compression (DEFLATE level 9):
+
+| Test fixture          | Space saved |
+| --------------------- | ----------: |
+| 1 MB technical text   |       88.6% |
+| 5 MB telemetry CSV    |       85.0% |
+| 10 MB structured JSON |       94.8% |
+| 256 KB random binary  |        0.0% |
+
+These are previously recorded fixture-specific measurements, not guarantees or newly executed benchmarks. Results vary with content, prior compression, device, and browser. Already-compressed files may see little or no size reduction.
+
+## Privacy and architecture
+
+Gravipress processes selected files locally in your browser. Compression does not upload file contents to a remote server, and no uploaded files are persisted in `localStorage` or `IndexedDB`. The application itself is delivered over HTTPS as a static site with a strict Content Security Policy configured in [`public/_headers`](public/_headers).
+
+```mermaid
+flowchart TD
+    A[Static application on Cloudflare Pages] --> B[Browser interface]
+    B --> C[PDF engine]
+    B --> D[Image engine]
+    B --> E[Archive worker]
+    C --> F[Local download]
+    D --> F
+    E --> F
+```
+
+The application uses binary signature validation, bounded processing limits, archive path sanitization, and cancellation controls to reduce avoidable processing risks. No application database or authentication service is required.
+
+## Technology stack
+
+| Layer                | Technology                                                        |
+| -------------------- | ----------------------------------------------------------------- |
+| Interface            | HTML, CSS, JavaScript                                             |
+| Build tooling        | Vite (`vite` `^6.0.0`)                                            |
+| PDF processing       | `pdf-lib` (`^1.17.1`), `pdfjs-dist` (`^6.5.438`)                  |
+| Image processing     | HTML5 Canvas API, `upng-js` (`^2.1.0`)                            |
+| Archive processing   | `fflate` (`^0.8.3`), Web Workers                                  |
+| Testing & formatting | Node.js test runner, Playwright (`^1.65.1`), Prettier (`^3.10.1`) |
+| Production hosting   | Cloudflare Pages                                                  |
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 18 or later (Node.js 22 recommended).
+- npm and a modern browser with ES modules, HTML5 Canvas, and Web Worker support.
+
+### Local development
+
+```bash
+git clone https://github.com/cgupta21/gravipress.git
+cd gravipress
+git checkout release/v1.0-non-multimedia
 npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite. Drop or select a PDF, image, batch of files, or archive folder, choose a preset, and click **Compress**.
+Open the local URL printed by Vite.
 
-## Build & test
+### Testing and building
 
-```sh
+```bash
 npm test
 npm run format:check
 npm run build
 npm run preview
 ```
 
-Deploy `dist/` to any static host. On Cloudflare Pages, connect the repository, set the framework preset to **Vite** (or **None**), build command `npm run build`, build output directory `dist`, and environment variable `NODE_VERSION=22`. Security headers and Content Security Policy are configured in `public/_headers`.
+For browser E2E testing, install Playwright browsers and run the configured suite:
 
-## Compression methods
+```bash
+npx playwright install
+npm run test:e2e
+```
 
-- **Light (structural optimization)**: Uses `pdf-lib` with compressed object streams (`useObjectStreams: true`) to compact PDF structure without rasterization. Preserves selectable text, hyperlinks, and interactive forms where supported.
-- **Balanced (adaptive ~144 DPI, JPEG 0.75)**: Always attempts structural optimization first so text-only PDFs keep selectable text and structure without unnecessary rasterization. For image-heavy or scanned PDFs, renders pages sequentially via `pdfjs-dist` at ~144 DPI (JPEG `0.75`), with a bounded adaptive step (`115 DPI`, JPEG `0.65`) if needed, and selects the smallest valid candidate.
-- **Maximum (adaptive ~96 DPI, JPEG 0.50)**: Attempts structural optimization first, then rasterizes image-heavy documents at ~96 DPI (JPEG `0.50`) with a bounded adaptive step (`72 DPI`, JPEG `0.45`) to prioritize smallest file size.
+## Deployment
 
-If no smaller valid output can be produced, Gravipress retains the original PDF, reports zero savings (`0 B / 0.0%`), and preserves the original filename on download rather than appending `-compressed.pdf`.
+The production website is hosted on Cloudflare Pages from the `release/v1.0-non-multimedia` branch.
 
-## Supported formats & privacy
+| Setting              | Value                                |
+| -------------------- | ------------------------------------ |
+| Production branch    | `release/v1.0-non-multimedia`        |
+| Framework preset     | Vite (or None)                       |
+| Build command        | `npm run build`                      |
+| Output directory     | `dist`                               |
+| Environment variable | `NODE_VERSION=22`                    |
+| Security headers     | [`public/_headers`](public/_headers) |
+| Production URL       | https://gravipress.pages.dev/        |
 
-- **Supported PDF**: `.pdf` (validated by `%PDF-` header).
-- **Supported Images**: `.jpg` / `.jpeg`, `.png`, `.webp`, and `.avif` (where browser-native AVIF encoding is supported), validated by binary file signatures and actual decoding.
-- **Supported General Files & Folders (ZIP / GZIP)**: Arbitrary files (text, CSV, JSON, XML, source code, documents, binary files) and nested folders (`webkitdirectory` or directory drag-and-drop) compressed in a Web Worker using `fflate`:
-  - **ZIP**: `Fast` (DEFLATE level 1), `Balanced` (DEFLATE level 6), `Maximum` (DEFLATE level 9), and `Store only` (level 0). Already-compressed formats (`.zip`, `.jpg`, `.png`, `.docx`, etc.) automatically use `STORE` inside DEFLATE archives to avoid wasted CPU/memory.
-  - **GZIP (`.gz`)**: Single-file stream compression (`1f 8b`). Disabled when multiple files or folders are selected.
-- **Supported Formats (v1.0)**: PDF (`.pdf`), raster images (`.jpg`/`.jpeg`, `.png`, `.webp`, `.avif`), batch queues, and lossless ZIP/GZIP archives. (Animated `.gif`/APNG/animated WebP/AVIF are rejected; multimedia codecs are not included in v1.0.)
-- **Image compression methods**:
-  - **PNG**: Uses `upng-js` for lossless deflate re-encoding (`Light`) and indexed palette quantization (`Balanced` / `Maximum`) while preserving alpha transparency.
-  - **JPEG / WebP / AVIF**: Uses browser-native Canvas encoding (`0.90` / `0.78` / `0.55` defaults), custom quality slider, optional aspect-ratio-preserving max-dimension resizing, and bounded binary-search target size optimization.
-  - **Metadata**: Browser Canvas/UPNG re-encoding removes EXIF/IPTC/XMP metadata and normalizes output to sRGB.
-- **Privacy**: All parsing, preview rendering, and compression execute 100% locally in your browser. No files are uploaded to external servers, and no uploaded files are persisted in `localStorage` or `IndexedDB`. All PDF.js worker, CMap, and standard font assets are bundled locally.
+The generated static `dist/` output can also be hosted on any compatible static hosting service.
 
-## Known limitations & browser compatibility
+## Processing limits and compatibility
 
-- **Rasterized PDF modes (`Balanced` / `Maximum`)**: When applied to image-heavy PDFs, pages are converted to JPEG images, removing selectable text, links, forms, and accessibility structure.
-- **Encrypted PDFs**: Password-protected or encrypted PDFs are rejected; encryption is never bypassed.
-- **Digital signatures**: Processing a digitally signed PDF can invalidate existing signatures (a warning is shown when signature markers are detected).
-- **AVIF encoding**: AVIF compression relies on browser-native `canvas.toBlob('image/avif')` support (available in modern desktop Chromium/Firefox builds, but not all headless or Safari environments). Unsupported browsers receive an explicit error rather than a silent format fallback.
-- **Image metadata & color space**: Browser Canvas and `upng-js` encoding strips EXIF/IPTC/XMP metadata and normalizes output to sRGB.
-- **Target size mode**: Target sizes are approached via bounded adaptive quality/palette search (`6` attempts max). If a target cannot be reached within permitted quality/dimension bounds, Gravipress returns the best smaller candidate and reports that the target was not met.
-- **Safety & memory limits**:
-  - **PDF**: `100 MB` max file size, `200` pages, `8192 px` max page side, `24 MP` max rendered page pixels.
-  - **Images**: `50 MB` max file size, `8192 px` max dimension, `32 MP` max decoded pixels (`~128 MB` RGBA) to protect desktop and mobile browser tabs.
-  - **Batch Queue**: Up to `20` files per batch and `100 MB` combined input size, processed sequentially to prevent memory spikes. Supports per-file preset overrides, reordering, individual/batch cancellation, and retry of failed/cancelled items. Failed or cancelled files are excluded from aggregate savings and ZIP archives.
-- **General Archive & Folder Limits**: Up to `250` files, `100 MB` combined input, `50 MB` single file, and `12` directory levels. Empty directories are not included by browser `webkitdirectory` pickers. All archive paths are sanitized against traversal (`..`), drive/UNC prefixes, control characters, and Windows reserved device names.
-- **Browser Compatibility**: Automated E2E verified in Playwright Chromium (`7/7` suites), Firefox (`3/3` critical suites), and WebKit (`3/3` critical suites). Note that WebKit automation provides useful Safari-engine coverage but does not guarantee identical behavior on every iOS/macOS Safari release.
+| Resource                |                                                       Limit |
+| ----------------------- | ----------------------------------------------------------: |
+| PDF input               | 100 MB / 200 pages / 8192 px max side / 24 MP rendered page |
+| Individual image        |             50 MB / 8192 px max side / 32 MP decoded pixels |
+| Batch queue             |                                  20 files / 100 MB combined |
+| Archive input           |                                 250 files / 100 MB combined |
+| Individual archive file |                                                       50 MB |
+| Archive folder depth    |                                                   12 levels |
 
-## Phase 5 General File & Folder Compression Benchmarks
+Mobile devices may have lower practical memory capacity. Chromium, Firefox, and WebKit have been covered by earlier automated testing; this does not guarantee identical behavior on every device or OS release.
 
-Automated benchmarks measured across realistic, non-repetitive datasets in headless Chromium, Firefox, and WebKit (Safari engine) using DEFLATE Web Workers via `fflate`:
+**Important:** Rasterized PDF compression (`Balanced` / `Maximum` on image-heavy PDFs) can remove searchable text, links, forms, and accessibility structure. Encrypted PDFs are rejected, and processing signed PDFs may invalidate digital signatures. Image re-encoding strips EXIF/IPTC/XMP metadata and normalizes output to sRGB. AVIF output depends on browser-native `canvas.toBlob('image/avif')` support.
 
-| Dataset / Fixture                                       | Uncompressed            | Preset / Level    | Output Archive  | Space Saved (%)          | Processing Duration | Engine Mode            |
-| ------------------------------------------------------- | ----------------------- | ----------------- | --------------- | ------------------------ | ------------------- | ---------------------- |
-| **1 MB Text Document** (realistic technical prose)      | 1,048,665 B (1.00 MB)   | **Fast** (L1)     | 177.3 KB        | 82.7%                    | 68 ms               | ZIP DEFLATE            |
-| **1 MB Text Document**                                  | 1,048,665 B (1.00 MB)   | **Balanced** (L6) | 118.1 KB        | 88.5%                    | 110 ms              | ZIP DEFLATE            |
-| **1 MB Text Document**                                  | 1,048,665 B (1.00 MB)   | **Maximum** (L9)  | 117.2 KB        | 88.6%                    | 116 ms              | ZIP DEFLATE            |
-| **5 MB Telemetry CSV** (realistic metrics & timestamps) | 5,242,952 B (5.00 MB)   | **Fast** (L1)     | 1,000.8 KB      | 80.5%                    | 183 ms              | ZIP DEFLATE            |
-| **5 MB Telemetry CSV**                                  | 5,242,952 B (5.00 MB)   | **Balanced** (L6) | 770.3 KB        | 85.0%                    | 276 ms              | ZIP DEFLATE            |
-| **5 MB Telemetry CSV**                                  | 5,242,952 B (5.00 MB)   | **Maximum** (L9)  | 770.0 KB        | 85.0%                    | 337 ms              | ZIP DEFLATE            |
-| **10 MB Machine JSON** (deeply nested records & arrays) | 10,485,938 B (10.00 MB) | **Balanced** (L6) | 536.3 KB        | 94.8%                    | 287 ms              | ZIP DEFLATE            |
-| **10 MB Machine JSON**                                  | 10,485,938 B (10.00 MB) | **Maximum** (L9)  | 536.1 KB        | 94.8%                    | 322 ms              | ZIP DEFLATE            |
-| **256 KB Random Binary**                                | 262,144 B (256 KB)      | **Balanced** (L6) | 262.3 KB        | 0.0% (overhead reported) | 12 ms               | ZIP (Incompressible)   |
-| **Nested Folder Hierarchy** (multi-level tree)          | Variable                | **Balanced** (L6) | Exact hierarchy | Restored byte-for-byte   | < 50 ms             | ZIP / tar.exe verified |
+## Project structure
 
-## Licenses
+```text
+gravipress/
+├── public/                     # Static assets, icons, _headers, licenses, sitemap.xml
+├── src/
+│   ├── components/             # Batch and archive workspace UI controllers
+│   ├── config/                 # Presets and processing limits
+│   ├── engines/                # PDF, image, batch, and archive engines
+│   ├── state/                  # Processing queue state
+│   ├── utils/                  # File, image, path, and download helpers
+│   ├── workers/                # Off-main-thread ZIP/GZIP Web Worker
+│   ├── main.js                 # Application orchestration
+│   └── style.css               # Industrial palette and hydraulic press UI
+├── tests/                      # Node unit tests and Playwright E2E suites
+├── index.html                  # Application entry point and SEO metadata
+├── LICENSE                     # MIT application license
+├── package.json                # Dependencies and npm scripts
+├── playwright.config.js        # Browser test configuration
+├── THIRD_PARTY_LICENSES.md     # Third-party dependency notices
+└── vite.config.js              # Build and preview server configuration
+```
 
-- **Application License**: MIT License — see [LICENSE](LICENSE).
-- **Third-Party Runtime Dependencies**: `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), `upng-js` (MIT), `pako` (MIT), `fflate` (MIT), `tslib` (0BSD). See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) and `public/licenses/`.
+## Roadmap
 
-## Structure
+- Improve accessibility, mobile usability, and browser compatibility.
+- Expand documentation, performance testing, and search discoverability.
+- Evaluate offline support.
+- Complete multimedia testing and dependency licensing review before any future multimedia release.
 
-- `index.html`: Semantic workspace, warnings, metrics, and dialogs (`#licenses-dialog`, `#dialog`)
-- `src/style.css`: Industrial palette, layout, and `--press`-synchronized hydraulic press
-- `src/main.js`: Application orchestration, cancellation, preview, and download flow
-- `src/engines/`: PDF (`pdf-loader.js`, `pdf-preview.js`, `pdf-compressor.js`), image (`image-compressor.js`), batch (`batch-compressor.js`), and archive (`general-compressor.js`, `gzip-compressor.js`) pipelines
-- `src/workers/archive.worker.js`: Off-main-thread ZIP/GZIP worker via `fflate`
-- `public/_headers`: Cloudflare Pages security headers and Content Security Policy
-- `THIRD_PARTY_LICENSES.md` & `public/licenses/`: Third-party copyright notices and full license texts
-- `tests/`: Unit tests (`npm test`) and Playwright E2E smoke/audit suites
+## Contributing
+
+Bug reports, feature suggestions, and pull requests are welcome. For substantial changes, open an issue first to discuss the proposed approach. Include reproduction steps and browser details when reporting bugs, and use non-sensitive test files. Run `npm test` and `npm run format:check` before submitting changes.
+
+## License
+
+Gravipress v1.0 is licensed under the [MIT License](LICENSE). See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) and `public/licenses/` for third-party copyright notices and license texts.
+
+---
+
+<div align="center">
+
+**Gravipress — Less space. More room.**
+
+[gravipress.pages.dev](https://gravipress.pages.dev/)
+
+</div>
