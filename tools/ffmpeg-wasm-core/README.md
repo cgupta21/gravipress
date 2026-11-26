@@ -12,7 +12,7 @@ All sources, toolchains, and libraries are pinned to immutable releases or speci
 | :--- | :--- | :--- | :--- |
 | **Toolchain** | Emscripten 3.1.40 | `emscripten/emsdk:3.1.40` (Docker Hub) | MIT / University of Illinois |
 | **FFmpeg** | 6.1.6 (`n6.1.6`) | `https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n6.1.6.tar.gz` | GPL-2.0-or-later |
-| **x264** | `baee400fa9ce39` | `https://code.videolan.org/videolan/x264` (pinned commit archive) | GPL-2.0-or-later |
+| **x264** | `baee400fa9ced6` | `https://github.com/ffmpegwasm/x264.git` (pinned commit) | GPL-2.0-or-later |
 | **libvpx** | 1.14.0 (`v1.14.0`) | `https://github.com/webmproject/libvpx/archive/refs/tags/v1.14.0.tar.gz` | BSD-3-Clause |
 | **libmp3lame** | 3.100 | `https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz` | LGPL-2.0-or-later |
 | **libogg** | 1.3.5 | `https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.gz` | BSD-3-Clause |

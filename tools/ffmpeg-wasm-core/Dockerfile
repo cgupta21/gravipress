@@ -33,11 +33,15 @@ RUN curl -fsSL -o /sources/lame.tar.gz https://downloads.sourceforge.net/project
     echo "c9b32b4253be5ae63d1ff16eea06b94b5f0f2951b7a02aceef58e3a3ce49c51f  /sources/libopus.tar.gz" >> /sources/checksums.txt && \
     sha256sum -c /sources/checksums.txt
 
-# Clone exact pinned Git tags/commits for repositories with moving tarball signatures
-RUN git clone --depth 1 --branch n6.1.6 https://github.com/FFmpeg/FFmpeg.git /sources/ffmpeg && \
-    git clone https://code.videolan.org/videolan/x264.git /sources/x264 && \
-    cd /sources/x264 && git checkout baee400fa9ce395256e26cf843813e8954aa4858 && \
-    git clone --depth 1 --branch v1.14.0 https://github.com/webmproject/libvpx.git /sources/libvpx
+# Clone FFmpeg 6.1.6 LTS source (pinned tag n6.1.6)
+RUN git clone --depth 1 --branch n6.1.6 https://github.com/FFmpeg/FFmpeg.git /sources/ffmpeg
+
+# Clone x264 from verified GitHub mirror and checkout exact pinned commit
+RUN git clone https://github.com/ffmpegwasm/x264.git /sources/x264 && \
+    cd /sources/x264 && git checkout baee400fa9ced6f5481a728138fed6e867b0ff7f
+
+# Clone libvpx source (pinned tag v1.14.0)
+RUN git clone --depth 1 --branch v1.14.0 https://github.com/webmproject/libvpx.git /sources/libvpx
 
 # -----------------------------------------------------------------------------
 # 2. Build libogg (Required by Vorbis)
@@ -168,7 +172,7 @@ License: GNU General Public License v2.0 or later (GPL-2.0-or-later)
 
 This binary package incorporates software developed by:
 - FFmpeg Project (FFmpeg 6.1.6, GPL-2.0-or-later, https://ffmpeg.org)
-- VideoLAN / x264 contributors (x264 baee400fa9ce39, GPL-2.0-or-later, https://www.videolan.org/developers/x264.html)
+- VideoLAN / x264 contributors (x264 baee400fa9ced6, GPL-2.0-or-later, https://www.videolan.org/developers/x264.html)
 - WebM Project / Google LLC (libvpx 1.14.0, BSD-3-Clause, https://www.webmproject.org/)
 - LAME Project (LAME 3.100, LGPL-2.0-or-later, https://lame.sourceforge.io/)
 - Xiph.Org Foundation (libogg 1.3.5, libvorbis 1.3.7, BSD-3-Clause, https://xiph.org/)
