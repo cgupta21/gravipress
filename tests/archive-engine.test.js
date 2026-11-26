@@ -163,10 +163,11 @@ test('compressFilesToZip compresses mixed files and nested folders with exact by
       Buffer.from(await balanced.blob.arrayBuffer())
     );
 
-    // List and extract with tar.exe (independent libarchive)
-    const listOut = execFileSync('tar.exe', ['-tf', zipFilePath], {
-      encoding: 'utf8',
-    });
+    // List and extract with an independent system ZIP utility (tar.exe on Windows, unzip on POSIX)
+    const isWin = process.platform === 'win32';
+    const listOut = isWin
+      ? execFileSync('tar.exe', ['-tf', zipFilePath], { encoding: 'utf8' })
+      : execFileSync('unzip', ['-Z1', zipFilePath], { encoding: 'utf8' });
     const listedFiles = listOut
       .trim()
       .split(/\r?\n/)
@@ -180,7 +181,11 @@ test('compressFilesToZip compresses mixed files and nested folders with exact by
       'project/empty.txt',
     ]);
 
-    execFileSync('tar.exe', ['-xf', zipFilePath, '-C', extractDir]);
+    if (isWin) {
+      execFileSync('tar.exe', ['-xf', zipFilePath, '-C', extractDir]);
+    } else {
+      execFileSync('unzip', ['-q', '-o', zipFilePath, '-d', extractDir]);
+    }
     assert.deepEqual(
       fs.readFileSync(path.join(extractDir, 'project/docs/notes.txt')),
       Buffer.from(textData)
