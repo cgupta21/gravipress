@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-# Production Sitemap URL deferred until final Vercel domain is confirmed:
-# Sitemap: https://<your-production-domain>/sitemap.xml
+Sitemap: https://gravipress.pages.dev/sitemap.xml

@@ -1,5 +1,7 @@
 # Gravipress v1.0 — Engineered to be smaller.
 
+**Live app:** [https://gravipress.pages.dev](https://gravipress.pages.dev)
+
 A local-first, client-side file compression utility for **PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives**. Uses the approved olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) palette with a mechanical hydraulic press interface synchronized to real compression progress. Built with plain HTML, CSS, JavaScript, `pdf-lib`, `pdfjs-dist`, `upng-js`, `fflate`, and Vite.
 
 ## Run locally
