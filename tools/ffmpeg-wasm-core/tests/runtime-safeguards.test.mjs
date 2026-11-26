@@ -1,13 +1,14 @@
 /**
  * runtime-safeguards.test.mjs
  * Focused verification tests for custom FFmpeg 5.1.10 WASM engine:
- * 1. Progress reporting units (microseconds, clamped [0.0, 1.0], no premature completion).
+ * 1. Progress reporting units (microseconds, clamped [0.0, 1.0], no premature completion, monotonic timestamps, exactly one 1.0).
  * 2. Suppression of fake 1.0 completion on genuine runtime failures.
- * 3. Actual encoding timeout enforcement (exceeded limit aborts cleanly with non-zero exit code).
+ * 3. Actual encoding timeout enforcement (exceeded limit aborts cleanly with non-zero exit code and suppresses 1.0).
  * 4. Repeated multi-operation workflow on same instance (probe -> transcode -> probe -> transcode).
  * 5. Genuine runtime failure reporting (never swallow errors or report fake 0 exit code).
  * 6. Corruption lockout prevention (never reuse corrupted instance).
  * 7. Clean recovery using a fresh WASM core instance.
+ * 8. Logger stdout/stderr capture and suppression of normal exit Aborted().
  */
 
 import { test } from 'node:test';
@@ -49,18 +50,21 @@ export async function runSafeguardTests(createFFmpegCore, wasmBinary) {
 
     const progressEvents = [];
     core.setProgress((p) => {
-      progressEvents.push(p);
+      progressEvents.push({ ...p });
     });
 
     const ret = core.exec('-i', 'test_progress.wav', '-c:a', 'libmp3lame', 'test_progress.mp3');
     assert.equal(ret, 0, 'Exec should succeed with exit code 0');
 
     assert.ok(progressEvents.length > 0, 'At least one progress event must be received');
+    let lastTime = 0;
     for (let i = 0; i < progressEvents.length; i++) {
       const { progress, time } = progressEvents[i];
       assert.ok(typeof progress === 'number' && !isNaN(progress), 'Progress must be a valid number');
       assert.ok(progress >= 0.0 && progress <= 1.0, `Progress ${progress} must be within [0.0, 1.0]`);
       assert.ok(typeof time === 'number' && time >= 0, `Time ${time} must be non-negative microseconds`);
+      assert.ok(time >= lastTime, `Media timestamp must be non-decreasing: ${time} >= ${lastTime}`);
+      lastTime = time;
 
       // All intermediate events must strictly be <= 0.99 (never premature 1.0)
       if (i < progressEvents.length - 1) {
@@ -71,6 +75,9 @@ export async function runSafeguardTests(createFFmpegCore, wasmBinary) {
     const finalEvent = progressEvents[progressEvents.length - 1];
     assert.equal(finalEvent.progress, 1.0, 'Final progress must be 1.0');
     assert.ok(finalEvent.time > 0, 'Final media time must be greater than 0');
+
+    const completionEvents = progressEvents.filter((p) => p.progress === 1.0);
+    assert.equal(completionEvents.length, 1, 'Exactly one final 1.0 completion event must be emitted');
 
     core.FS.unlink('test_progress.wav');
     core.FS.unlink('test_progress.mp3');
@@ -107,12 +114,20 @@ export async function runSafeguardTests(createFFmpegCore, wasmBinary) {
 
     // Set an ultra-short timeout of 10ms to trigger timeout limit during encoding
     core.setTimeout(10);
+    const progressEvents = [];
+    core.setProgress((p) => progressEvents.push(p));
 
     const ret = core.exec('-i', 'test_timeout.wav', '-c:a', 'libmp3lame', '-b:a', '128k', 'out_timeout.mp3');
     assert.notEqual(ret, 0, 'Timed-out execution must return non-zero exit code');
+    assert.equal(
+      progressEvents.some((p) => p.progress === 1.0),
+      false,
+      'Timed-out execution must never emit 1.0 progress'
+    );
 
     core.reset();
     assert.equal(core.timeout, -1, 'Reset must restore timeout to -1');
+    assert.equal(core._timedOut, false, 'Reset must restore _timedOut to false');
 
     core.FS.unlink('test_timeout.wav');
     if (core.FS.analyzePath('out_timeout.mp3').exists) {
@@ -203,6 +218,28 @@ export async function runSafeguardTests(createFFmpegCore, wasmBinary) {
     assert.equal(freshCore.isCorrupted(), false, 'New instance must be uncorrupted');
     const ret = freshCore.exec('-version');
     assert.equal(ret, 0, 'Fresh instance should execute normally with code 0');
+  });
+
+  // Test 7: Logger output capture and suppression of normal Aborted()
+  await test('core.setLogger() captures stdout/stderr and suppresses normal exit Aborted()', async () => {
+    const logs = [];
+    const core = await createFFmpegCore({ wasmBinary });
+    core.setLogger((log) => {
+      logs.push(log);
+    });
+
+    const ret = core.exec('-version');
+    assert.equal(ret, 0, 'Exec -version should succeed');
+    assert.ok(logs.length > 0, 'Logger must capture messages');
+    assert.ok(
+      logs.some((l) => l.message && l.message.includes('ffmpeg version')),
+      'Logger must capture version info'
+    );
+    assert.equal(
+      logs.some((l) => l.message && l.message.includes('Aborted()')),
+      false,
+      'Clean exit must not log Aborted()'
+    );
   });
 
   console.log('--- All Safeguard Tests Completed Successfully ---');

@@ -7,11 +7,14 @@ Module["DEFAULT_ARGS"] = DEFAULT_ARGS;
 Module["DEFAULT_ARGS_FFPROBE"] = DEFAULT_ARGS_FFPROBE;
 Module["ret"] = -1;
 Module["timeout"] = -1;
-Module["logger"] = () => {};
+Module["logger"] = null;
 Module["progress"] = () => {};
 Module["_corrupted"] = false;
 Module["_cleanExit"] = false;
+Module["_timedOut"] = false;
 Module["_execStartTime"] = 0;
+
+let lastProgressTime = 0;
 
 function stringToPtr(str, allocated) {
   const len = Module["lengthBytesUTF8"](str) + 1;
@@ -46,19 +49,6 @@ function freePtrs(allocated) {
   }
 }
 
-function print(message) {
-  Module["logger"]({ type: "stdout", message: message });
-}
-
-function printErr(message) {
-  if (
-    !message.startsWith("Aborted(native code called abort())") &&
-    !message.startsWith("Aborted()")
-  ) {
-    Module["logger"]({ type: "stderr", message: message });
-  }
-}
-
 function exec(..._args) {
   if (Module["_corrupted"]) {
     throw new Error(
@@ -68,7 +58,9 @@ function exec(..._args) {
   const args = [...Module["DEFAULT_ARGS"], ..._args];
   Module["ret"] = -1;
   Module["_cleanExit"] = false;
+  Module["_timedOut"] = false;
   Module["_execStartTime"] = Date.now();
+  lastProgressTime = 0;
   const allocated = [];
   const stack = typeof Module["stackSave"] === "function" ? Module["stackSave"]() : 0;
   try {
@@ -104,6 +96,19 @@ function exec(..._args) {
     }
     freePtrs(allocated);
   }
+
+  // Force non-zero exit code if timeout occurred
+  if (Module["_timedOut"]) {
+    Module["ret"] = 1;
+  }
+
+  // Emit exactly one final 1.0 progress event upon verified successful completion
+  if (Module["ret"] === 0 && !Module["_timedOut"] && !Module["_corrupted"]) {
+    try {
+      Module["progress"]({ progress: 1.0, time: lastProgressTime });
+    } catch (_) {}
+  }
+
   return Module["ret"];
 }
 
@@ -116,6 +121,7 @@ function ffprobe(..._args) {
   const args = [...Module["DEFAULT_ARGS_FFPROBE"], ..._args];
   Module["ret"] = -1;
   Module["_cleanExit"] = false;
+  Module["_timedOut"] = false;
   Module["_execStartTime"] = Date.now();
   const allocated = [];
   const stack = typeof Module["stackSave"] === "function" ? Module["stackSave"]() : 0;
@@ -160,7 +166,7 @@ function ffprobe(..._args) {
 }
 
 function setLogger(logger) {
-  Module["logger"] = logger;
+  Module["logger"] = typeof logger === "function" ? logger : null;
 }
 
 function setTimeout(timeout) {
@@ -168,18 +174,23 @@ function setTimeout(timeout) {
 }
 
 function setProgress(handler) {
-  Module["progress"] = handler;
+  Module["progress"] = typeof handler === "function" ? handler : () => {};
 }
 
 function receiveProgress(progress, time) {
   if (typeof progress === "number" && !isNaN(progress) && isFinite(progress)) {
-    const clampedProgress = Math.max(0, Math.min(1, progress));
+    // Intermediate encoding progress is strictly kept at or below 0.99
+    const clampedProgress = Math.max(0, Math.min(0.99, progress));
     const validTime =
       typeof time === "number" && !isNaN(time) && isFinite(time) && time >= 0
         ? time
         : 0;
+    // Maintain non-decreasing timestamps
+    if (validTime >= lastProgressTime) {
+      lastProgressTime = validTime;
+    }
     try {
-      Module["progress"]({ progress: clampedProgress, time: validTime });
+      Module["progress"]({ progress: clampedProgress, time: lastProgressTime });
     } catch (_) {}
   }
 }
@@ -188,6 +199,8 @@ function reset() {
   Module["ret"] = -1;
   Module["timeout"] = -1;
   Module["_cleanExit"] = false;
+  Module["_timedOut"] = false;
+  lastProgressTime = 0;
 }
 
 function isCorrupted() {
@@ -212,8 +225,6 @@ function _locateFile(path, prefix) {
 
 Module["stringToPtr"] = stringToPtr;
 Module["stringsToPtr"] = stringsToPtr;
-Module["print"] = print;
-Module["printErr"] = printErr;
 Module["locateFile"] = _locateFile;
 Module["exec"] = exec;
 Module["ffprobe"] = ffprobe;

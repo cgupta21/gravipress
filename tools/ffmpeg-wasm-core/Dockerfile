@@ -22,7 +22,7 @@ WORKDIR /sources
 # -----------------------------------------------------------------------------
 # 1. Download & Verify All Pinned Source Tarballs via SHA-256 Checksums
 # -----------------------------------------------------------------------------
-COPY sources.env patch-wasm.py post.js /sources/
+COPY sources.env patch-wasm.py pre.js post.js /sources/
 
 RUN curl -fsSL -o /sources/lame.tar.gz https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
     curl -fsSL -o /sources/libogg.tar.gz https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.gz && \
@@ -248,6 +248,7 @@ RUN cd /sources/ffmpeg && \
       -sEXPORTED_RUNTIME_METHODS="['FS', 'cwrap', 'setValue', 'getValue', 'UTF8ToString', 'stringToUTF8', 'lengthBytesUTF8', 'stackSave', 'stackRestore']" \
       -sINVOKE_RUN=0 \
       -sEXIT_RUNTIME=0 \
+      --pre-js /sources/pre.js \
       --post-js /sources/post.js \
       -lnodefs.js \
       -lworkerfs.js \
@@ -351,6 +352,10 @@ RUN cat <<'EOF' > /dist/manifest.json
     "setProgress",
     "isCorrupted",
     "FS"
+  ],
+  "glueFiles": [
+    "pre.js",
+    "post.js"
   ]
 }
 EOF
@@ -394,6 +399,7 @@ RUN tar -ztvf /dist/ffmpeg-corresponding-source-5.1.10.tar.gz > /tmp/archive_con
       "checksums.txt" \
       "sources.env" \
       "patch-wasm.py" \
+      "pre.js" \
       "post.js" \
       "build-scripts/Dockerfile" \
       "build-scripts/build-custom-ffmpeg.yml" \

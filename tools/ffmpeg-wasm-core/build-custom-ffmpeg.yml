@@ -70,6 +70,7 @@ jobs:
             "checksums.txt" \
             "sources.env" \
             "patch-wasm.py" \
+            "pre.js" \
             "post.js" \
             "build-scripts/Dockerfile" \
             "build-scripts/build-custom-ffmpeg.yml" \

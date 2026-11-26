@@ -38,7 +38,11 @@ void exit_program(int ret)
     program_exit = NULL;
 
     EM_ASM({
-        Module.ret = $0;
+        if (Module._timedOut) {
+            Module.ret = 1;
+        } else {
+            Module.ret = $0;
+        }
         Module._cleanExit = true;
     }, ret);
     abort();
@@ -208,6 +212,7 @@ EM_JS(void, send_progress, (double progress, double time), {
 EM_JS(int, check_timeout, (void), {
     if (typeof Module.timeout === "number" && Module.timeout > 0 && typeof Module._execStartTime === "number") {
         if ((Date.now() - Module._execStartTime) >= Module.timeout) {
+            Module._timedOut = true;
             return 1;
         }
     }
@@ -274,6 +279,7 @@ old_report = """    if (is_last_report)
 new_report = """    if (check_timeout()) {
         av_log(NULL, AV_LOG_ERROR, "Processing timed out (execution limit exceeded).\\n");
         received_sigterm = 1;
+        main_return_code = 1;
     }
 
     int64_t duration = -1;
@@ -290,7 +296,7 @@ new_report = """    if (check_timeout()) {
         int64_t pts_abs = pts;
         if (duration > 0) {
             double p = (double)pts_abs / (double)duration;
-            if (p > 0.99 && !is_last_report) {
+            if (p > 0.99) {
                 p = 0.99;
             } else if (p < 0.0) {
                 p = 0.0;
@@ -302,10 +308,6 @@ new_report = """    if (check_timeout()) {
     }
 
     if (is_last_report) {
-        if (!received_sigterm && main_return_code == 0) {
-            int64_t final_time = duration > 0 ? duration : (pts != AV_NOPTS_VALUE && pts > 0 ? pts : 0);
-            send_progress(1.0, (double)final_time);
-        }
         print_final_stats(total_size);
     }"""
 
