@@ -32,6 +32,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Run dependency security audit
+        run: npm audit --audit-level=high
+
       - name: Verify zero FFmpeg dependencies in lockfile
         run: |
           if grep -qi "ffmpeg" package.json package-lock.json; then
