@@ -70,9 +70,14 @@ let activeAbortController = null;
 let isCompressing = false;
 let isPreparingOffline = false;
 let isApplyingUpdate = false;
+let remoteUpdateLockUntil = 0;
 
 function isOperationActive() {
   return Boolean(isCompressing || isPreparingOffline || isApplyingUpdate);
+}
+
+function isRemoteUpdateLocked() {
+  return Date.now() < remoteUpdateLockUntil;
 }
 
 let batchMode = false;
@@ -1164,7 +1169,7 @@ async function startArchiveCompression() {
 }
 
 async function startCompression() {
-  if (isCompressing || isApplyingUpdate) {
+  if (isCompressing || isApplyingUpdate || isRemoteUpdateLocked()) {
     return;
   }
 
@@ -1818,6 +1823,10 @@ if ('serviceWorker' in navigator) {
     try {
       waitingWorker.postMessage({ type: 'APPLY_UPDATE' });
     } catch {
+      if (updateApplyTimer) {
+        clearTimeout(updateApplyTimer);
+        updateApplyTimer = null;
+      }
       isApplyingUpdate = false;
       reloadingForUpdate = false;
       setUpdateButtonsBusy(false);
@@ -1850,12 +1859,16 @@ if ('serviceWorker' in navigator) {
       offlinePrepareBtn.hidden = false;
       offlinePrepareBtn.disabled = false;
       offlineRemoveBtn.hidden = data.optionalCachedCount === 0;
-    } else if (data.type === 'CHECK_BUSY_FOR_UPDATE' && data.requestId) {
+    } else if (data.type === 'CHECK_BUSY_FOR_UPDATE' && typeof data.requestId === 'string') {
+      const busy = Boolean(isCompressing || isPreparingOffline || isApplyingUpdate);
+      if (!busy) {
+        remoteUpdateLockUntil = Date.now() + 2500;
+      }
       const target = event.source || navigator.serviceWorker.controller;
       target?.postMessage({
         type: 'BUSY_STATUS',
         requestId: data.requestId,
-        busy: Boolean(isCompressing || isPreparingOffline),
+        busy,
       });
     } else if (data.type === 'UPDATE_BLOCKED_OTHER_CLIENTS') {
       isApplyingUpdate = false;
@@ -1896,7 +1909,14 @@ if ('serviceWorker' in navigator) {
 
   if (offlinePrepareBtn) {
     offlinePrepareBtn.onclick = () => {
-      if (!navigator.serviceWorker.controller || isApplyingUpdate || isCompressing) return;
+      if (
+        !navigator.serviceWorker.controller ||
+        isApplyingUpdate ||
+        isCompressing ||
+        isRemoteUpdateLocked()
+      ) {
+        return;
+      }
       isPreparingOffline = true;
       offlinePrepareBtn.disabled = true;
       navigator.serviceWorker.controller.postMessage({ type: 'PREPARE_OFFLINE' });

@@ -162,6 +162,61 @@ async function prepareOfflineAssets() {
 }
 
 const pendingBusyChecks = new Map();
+const BUSY_CHECK_TIMEOUT_MS = 450;
+const BUSY_CHECK_POLL_MS = 20;
+const REQUEST_ID_RE = /^chk-[0-9]+-[a-z0-9]{6,12}$/;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isSameOriginSource(event) {
+  if (typeof event.origin === 'string' && event.origin !== '' && event.origin !== self.location.origin) {
+    return false;
+  }
+  const source = event.source;
+  if (!source || typeof source.id !== 'string' || source.id.length === 0) {
+    return false;
+  }
+  if (typeof source.url === 'string' && source.url.length > 0) {
+    try {
+      if (new URL(source.url).origin !== self.location.origin) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function handleBusyStatusMessage(event) {
+  if (!event || !event.data || typeof event.data !== 'object' || Array.isArray(event.data)) {
+    return;
+  }
+  const data = event.data;
+  if (data.type !== 'BUSY_STATUS') return;
+  if (typeof data.requestId !== 'string' || !REQUEST_ID_RE.test(data.requestId)) return;
+  if (typeof data.busy !== 'boolean') return;
+  if (!isSameOriginSource(event)) return;
+  if (!pendingBusyChecks.has(data.requestId)) return;
+
+  const entry = pendingBusyChecks.get(data.requestId);
+  const now = Date.now();
+  if (!entry || entry.completed || now > entry.expiresAt) {
+    pendingBusyChecks.delete(data.requestId);
+    return;
+  }
+
+  const clientId = event.source.id;
+  if (!entry.expectedClientIds.has(clientId)) return;
+  if (entry.responses.has(clientId)) return;
+
+  entry.responses.set(clientId, data.busy);
+  if (entry.responses.size >= entry.expectedClientIds.size) {
+    entry.completed = true;
+  }
+}
 
 async function checkOtherClientsSafeForUpdate(sourceClient) {
   const clients = await self.clients.matchAll({
@@ -175,37 +230,37 @@ async function checkOtherClientsSafeForUpdate(sourceClient) {
     return { safe: true, busyDetected: false, otherCount: 0 };
   }
 
-  const requestId = `chk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const responses = new Map();
+  const rand = Math.random().toString(36).slice(2, 10).padEnd(6, '0');
+  const requestId = `chk-${Date.now()}-${rand}`;
+  const expectedClientIds = new Set(otherClients.map((client) => client.id));
+  const entry = {
+    requestId,
+    expectedClientIds,
+    responses: new Map(),
+    expiresAt: Date.now() + BUSY_CHECK_TIMEOUT_MS,
+    completed: false,
+  };
+  pendingBusyChecks.set(requestId, entry);
 
-  const waitPromise = new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      pendingBusyChecks.delete(requestId);
-      resolve();
-    }, 450);
+  try {
+    for (const client of otherClients) {
+      client.postMessage({ type: 'CHECK_BUSY_FOR_UPDATE', requestId });
+    }
 
-    pendingBusyChecks.set(requestId, (clientId, busy) => {
-      responses.set(clientId, Boolean(busy));
-      if (responses.size >= otherClients.length) {
-        clearTimeout(timer);
-        pendingBusyChecks.delete(requestId);
-        resolve();
-      }
-    });
-  });
-
-  for (const client of otherClients) {
-    client.postMessage({ type: 'CHECK_BUSY_FOR_UPDATE', requestId });
+    while (!entry.completed && Date.now() < entry.expiresAt) {
+      await sleep(BUSY_CHECK_POLL_MS);
+    }
+  } finally {
+    entry.completed = true;
+    pendingBusyChecks.delete(requestId);
   }
-
-  await waitPromise;
 
   let busyDetected = false;
   let allResponded = true;
   for (const client of otherClients) {
-    if (!responses.has(client.id)) {
+    if (!entry.responses.has(client.id)) {
       allResponded = false;
-    } else if (responses.get(client.id)) {
+    } else if (entry.responses.get(client.id) === true) {
       busyDetected = true;
     }
   }
@@ -218,7 +273,12 @@ async function checkOtherClientsSafeForUpdate(sourceClient) {
 }
 
 self.addEventListener('message', (event) => {
-  const data = event.data || {};
+  if (!event || !event.data || typeof event.data !== 'object' || Array.isArray(event.data)) {
+    return;
+  }
+  const data = event.data;
+  if (typeof data.type !== 'string') return;
+
   if (data.type === 'GET_OFFLINE_STATUS') {
     event.waitUntil(computeOfflineStatus().then((s) => event.source?.postMessage(s)));
   } else if (data.type === 'PREPARE_OFFLINE') {
@@ -230,11 +290,8 @@ self.addEventListener('message', (event) => {
         .then(() => computeOfflineStatus())
         .then((s) => broadcast(s))
     );
-  } else if (data.type === 'BUSY_STATUS' && data.requestId) {
-    const resolver = pendingBusyChecks.get(data.requestId);
-    if (resolver && event.source) {
-      resolver(event.source.id, data.busy);
-    }
+  } else if (data.type === 'BUSY_STATUS') {
+    handleBusyStatusMessage(event);
   } else if (data.type === 'APPLY_UPDATE') {
     event.waitUntil(
       checkOtherClientsSafeForUpdate(event.source).then((result) => {
