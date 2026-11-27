@@ -63,7 +63,7 @@
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "Any (Web Browser)",
         "browserRequirements": "Requires JavaScript and HTML5 Web Workers",
-        "softwareVersion": "1.1.1",
+        "softwareVersion": "1.2.0",
         "description": "A local-first browser compression utility for PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives.",
         "featureList": [
           "Client-side PDF compression",
@@ -129,7 +129,7 @@
             id="file"
             hidden
             multiple
-            accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.avif,image/avif,.zip"
+            accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.avif,image/avif,.zip,.mp4,video/mp4,.webm,video/webm,.mp3,audio/mpeg,.wav,audio/wav,.ogg,audio/ogg,.m4a,audio/mp4,.opus,audio/opus"
           />
 
           <button class="drop" id="drop" type="button">
@@ -253,6 +253,73 @@
 
             <p class="small option-note" id="metadata-note">
               Re-encoding removes EXIF/IPTC/XMP metadata and normalizes to sRGB.
+            </p>
+          </div>
+
+          <div class="image-options" id="video-options" hidden>
+            <div class="option-row">
+              <label for="video-codec">Video codec</label>
+              <select id="video-codec">
+                <option value="vp9">VP9 (WebM)</option>
+                <option value="vp8">VP8 (WebM)</option>
+              </select>
+            </div>
+            <div class="option-row">
+              <label for="video-max-width">Max width</label>
+              <select id="video-max-width">
+                <option value="1920">Original (≤1920px)</option>
+                <option value="1280">1280px (720p)</option>
+                <option value="854">854px (480p)</option>
+                <option value="640" selected>640px (360p)</option>
+              </select>
+            </div>
+            <div class="option-row">
+              <label for="video-bitrate">Target bitrate</label>
+              <select id="video-bitrate">
+                <option value="800000">Light (800 kbps)</option>
+                <option value="400000" selected>Balanced (400 kbps)</option>
+                <option value="200000">Maximum (200 kbps)</option>
+              </select>
+            </div>
+            <p class="small option-note">
+              WebM output via native WebCodecs. Opus audio is preserved when supported. Max 100 MB / 300s.
+            </p>
+          </div>
+
+          <div class="image-options" id="audio-options" hidden>
+            <div class="option-row">
+              <label for="audio-format">Output format</label>
+              <select id="audio-format">
+                <option value="opus-webm">Opus (WebM — lossy)</option>
+                <option value="opus-ogg">Opus (OGG — lossy)</option>
+                <option value="wav">WAV (PCM — uncompressed)</option>
+              </select>
+            </div>
+            <div class="option-row" id="audio-bitrate-row">
+              <label for="audio-bitrate">Audio bitrate</label>
+              <select id="audio-bitrate">
+                <option value="128000">128 kbps</option>
+                <option value="96000">96 kbps</option>
+                <option value="64000" selected>64 kbps</option>
+                <option value="48000">48 kbps</option>
+              </select>
+            </div>
+            <div class="option-row">
+              <label for="audio-sample-rate">Sample rate</label>
+              <select id="audio-sample-rate">
+                <option value="48000" selected>48000 Hz</option>
+                <option value="44100">44100 Hz</option>
+              </select>
+            </div>
+            <div class="option-row">
+              <label for="audio-channels">Channels</label>
+              <select id="audio-channels">
+                <option value="2" selected>Stereo (2 ch)</option>
+                <option value="1">Mono (1 ch)</option>
+              </select>
+            </div>
+            <p class="small option-note" id="audio-format-note">
+              Opus compresses audio lossily. WAV converts to uncompressed 16-bit PCM.
             </p>
           </div>
 
@@ -531,6 +598,21 @@
           <a href="/licenses/upng-js-MIT.txt" target="_blank" rel="noopener"
             >MIT License</a
           >
+        </li>
+        <li>
+          <strong>mediabunny</strong> (<code>1.66.5</code>) — Vanilagy —
+          <a
+            href="/licenses/mediabunny-MPL-2.0.txt"
+            target="_blank"
+            rel="noopener"
+            >MPL-2.0 License</a
+          >
+          (<a
+            href="https://github.com/Vanilagy/mediabunny/tree/v1.66.5"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Source v1.66.5</a
+          >)
         </li>
         <li>
           <strong>Transitive Runtime Notices:</strong>

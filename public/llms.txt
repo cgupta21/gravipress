@@ -21,6 +21,8 @@
 - **AVIF** (.avif) — browser-dependent compression via browser Canvas API
 - **ZIP** (.zip) — DEFLATE compression for files and folders (levels 0, 1, 6, 9)
 - **GZIP** (.gz) — DEFLATE compression for single files
+- **Video (browser-dependent)** — VP8/VP9 WebM output via native WebCodecs and Mediabunny (no H.264 encoding)
+- **Audio (browser-dependent)** — Opus (WebM/OGG) and PCM WAV conversion via native WebCodecs (no AAC/MP3 encoding)
 
 ## Privacy
 

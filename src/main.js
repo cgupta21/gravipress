@@ -6,6 +6,12 @@ import {
   renderBatchQueue,
   renderBatchSummary,
 } from './components/batch-workspace.js';
+import {
+  isAudioFile,
+  isVideoFile,
+  loadNativeMediaEngine,
+  syncMediaCapabilityControls,
+} from './components/media-workspace.js';
 import { ARCHIVE_LIMITS, ARCHIVE_PRESETS } from './config/archive-presets.js';
 import { BATCH_LIMITS, QUEUE_STATUS } from './config/batch-limits.js';
 import {
@@ -728,6 +734,50 @@ async function handleSelectedImage(file, bytes) {
   }
 }
 
+async function handleSelectedVideo(file) {
+  resetWorkspace();
+  selectedFile = file;
+  selectedFileBytes = new Uint8Array(await file.arrayBuffer());
+  selectedKind = 'video';
+
+  getElement('filelabel').textContent = file.name;
+  getElement('filesub').textContent = `${formatFileSize(file.size)} — Video ready`;
+  getElement('filename').textContent = file.name;
+  getElement('filemeta').hidden = false;
+  getElement('filemeta').textContent = `${formatFileSize(file.size)} · VIDEO`;
+  getElement('paperhead').textContent = 'VIDEO INPUT';
+  getElement('video-options').hidden = false;
+  getElement('audio-options').hidden = true;
+  getElement('status').textContent = 'VIDEO READY';
+
+  await syncMediaCapabilityControls({
+    videoCodecSelect: getElement('video-codec'),
+    onUnsupported: (msg) => showError(msg),
+  });
+}
+
+async function handleSelectedAudio(file) {
+  resetWorkspace();
+  selectedFile = file;
+  selectedFileBytes = new Uint8Array(await file.arrayBuffer());
+  selectedKind = 'audio';
+
+  getElement('filelabel').textContent = file.name;
+  getElement('filesub').textContent = `${formatFileSize(file.size)} — Audio ready`;
+  getElement('filename').textContent = file.name;
+  getElement('filemeta').hidden = false;
+  getElement('filemeta').textContent = `${formatFileSize(file.size)} · AUDIO`;
+  getElement('paperhead').textContent = 'AUDIO INPUT';
+  getElement('audio-options').hidden = false;
+  getElement('video-options').hidden = true;
+  getElement('status').textContent = 'AUDIO READY';
+
+  await syncMediaCapabilityControls({
+    audioFormatSelect: getElement('audio-format'),
+    onUnsupported: (msg) => showError(msg),
+  });
+}
+
 async function selectBrowserFiles(fileList) {
   const files = Array.from(fileList || []).filter(Boolean);
   if (files.length === 0) {
@@ -741,6 +791,22 @@ async function selectBrowserFiles(fileList) {
 
   const file = files[0];
   try {
+    if (file.size === 0) {
+      resetWorkspace();
+      showError('The selected file is empty (0 bytes).');
+      return;
+    }
+
+    if (isVideoFile(file)) {
+      await handleSelectedVideo(file);
+      return;
+    }
+
+    if (isAudioFile(file)) {
+      await handleSelectedAudio(file);
+      return;
+    }
+
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
@@ -830,6 +896,8 @@ function resetWorkspace() {
   getElement('filemeta').hidden = true;
   getElement('filemeta').textContent = '';
   getElement('paperhead').textContent = 'DOCUMENT 001';
+  getElement('video-options').hidden = true;
+  getElement('audio-options').hidden = true;
   syncImageOptionsVisibility();
   updatePresetDescription();
   updateWarnings();
@@ -1099,6 +1167,85 @@ async function startCompression() {
     '(prefers-reduced-motion: reduce)'
   ).matches;
 
+  if (selectedKind === 'video' || selectedKind === 'audio') {
+    const t0 = performance.now();
+    try {
+      const engine = await loadNativeMediaEngine();
+      const onProgress = (p) => {
+        if (operationId !== activeOperationId) return;
+        const pct = Math.min(99, Math.max(1, Math.round(p * 100)));
+        updateProgress(pct);
+        setPressPosition(0.15 + pct * 0.007);
+      };
+
+      let out;
+      let ext;
+      let methodLabel;
+      if (selectedKind === 'video') {
+        const codec = getElement('video-codec').value;
+        const bitrate = Number(getElement('video-bitrate').value);
+        const maxWidth = Number(getElement('video-max-width').value);
+        out = await engine.compressVideoToWebM(selectedFile, {
+          codec,
+          bitrate,
+          maxWidth,
+          signal,
+          onProgress,
+        });
+        ext = 'webm';
+        methodLabel = `${codec.toUpperCase()} WebM (native WebCodecs)`;
+      } else {
+        const format = getElement('audio-format').value;
+        const bitrate = Number(getElement('audio-bitrate').value);
+        const sampleRate = Number(getElement('audio-sample-rate').value);
+        const numberOfChannels = Number(getElement('audio-channels').value);
+        out = await engine.compressAudio(selectedFile, {
+          format,
+          bitrate,
+          sampleRate,
+          numberOfChannels,
+          signal,
+          onProgress,
+        });
+        ext = format === 'wav' ? 'wav' : format === 'opus-ogg' ? 'ogg' : 'webm';
+        methodLabel =
+          format === 'wav'
+            ? 'PCM WAV (uncompressed conversion)'
+            : `Opus (${ext.toUpperCase()})`;
+      }
+
+      if (operationId !== activeOperationId) return;
+      const baseName = selectedFile.name.replace(/\.[^.]+$/, '');
+      compressionResult = {
+        kind: selectedKind,
+        bytes: out.bytes,
+        mimeType: out.mimeType,
+        extension: ext,
+        wasReduced: out.bytes.byteLength < selectedFile.size,
+        originalBytes: selectedFile.size,
+        compressedBytes: out.bytes.byteLength,
+        durationMs: Math.round(performance.now() - t0),
+        method: methodLabel,
+        outputFilename: `${baseName}-gravipress.${ext}`,
+      };
+      updateProgress(100);
+      setPressPosition(1);
+      getElement('status').textContent = 'PRESS COMPLETE';
+      renderResultMetrics(compressionResult);
+      getElement('result').hidden = false;
+    } catch (err) {
+      if (operationId !== activeOperationId) return;
+      resetPressState();
+      showError(err?.message || 'Media processing failed.');
+    } finally {
+      if (operationId === activeOperationId) {
+        setCompressionUiState(false);
+        activeAbortController = null;
+      }
+    }
+    return;
+  }
+
   try {
     const onProgress = ({ label, progress, indeterminate }) => {
       if (operationId !== activeOperationId) {
@@ -1189,19 +1336,23 @@ function handleDownload() {
   downloadButton.disabled = true;
 
   try {
+    const isMedia =
+      compressionResult.kind === 'video' || compressionResult.kind === 'audio';
     const mimeType =
-      compressionResult.kind === 'image'
+      isMedia || compressionResult.kind === 'image'
         ? compressionResult.mimeType
         : 'application/pdf';
     const blob = createFileBlob(compressionResult.bytes, mimeType);
-    const filename = compressionResult.wasReduced
-      ? compressionResult.kind === 'image'
-        ? buildCompressedImageFilename(
-            selectedFile.name,
-            compressionResult.extension
-          )
-        : buildCompressedFilename(selectedFile.name)
-      : selectedFile.name;
+    const filename = isMedia
+      ? compressionResult.outputFilename
+      : compressionResult.wasReduced
+        ? compressionResult.kind === 'image'
+          ? buildCompressedImageFilename(
+              selectedFile.name,
+              compressionResult.extension
+            )
+          : buildCompressedFilename(selectedFile.name)
+        : selectedFile.name;
 
     triggerFileDownload(blob, filename);
   } catch (error) {
@@ -1430,6 +1581,11 @@ getElement('target-size').onchange = (event) => {
 
 getElement('enable-resize').onchange = (event) => {
   getElement('max-dimension').disabled = !event.target.checked;
+};
+
+getElement('audio-format').onchange = (event) => {
+  const isWav = event.target.value === 'wav';
+  getElement('audio-bitrate').disabled = isWav;
 };
 
 getElement('start').onclick = startCompression;
