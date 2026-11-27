@@ -114,7 +114,13 @@ function showError(message) {
 
 function updatePresetDescription() {
   const mode = getSelectedMode();
-  if (selectedKind === 'image') {
+  if (selectedKind === 'video') {
+    getElement('quality').textContent =
+      'Compresses video to VP8/VP9 WebM using native WebCodecs with Opus audio when supported.';
+  } else if (selectedKind === 'audio') {
+    getElement('quality').textContent =
+      'Compresses audio to Opus (WebM/OGG) or converts to uncompressed 16-bit PCM WAV.';
+  } else if (selectedKind === 'image') {
     const preset = IMAGE_PRESETS[mode];
     if (preset) {
       getElement('quality').textContent = preset.description;
@@ -136,6 +142,8 @@ function updateWarnings() {
     if (preset?.warning) {
       warnings.push(preset.warning);
     }
+  } else if (selectedKind === 'video' || selectedKind === 'audio') {
+    // Multimedia modes do not use PDF rasterization warnings.
   } else if (selectedKind !== 'image') {
     const preset = COMPRESSION_PRESETS[mode];
     if (preset?.warning) {
@@ -292,14 +300,23 @@ function renderResultMetrics(result) {
           ['DURATION', `${result.durationMs} ms`],
           ['METHOD', result.methodUsed],
         ]
-      : [
-          ['ORIGINAL', formatFileSize(result.originalSize)],
-          ['OUTPUT', formatFileSize(result.compressedSize)],
-          ['SAVED', reductionText],
-          ['DURATION', `${result.durationMs} ms`],
-          ['PAGES', String(result.pageCount)],
-          ['METHOD', result.methodUsed || result.mode],
-        ];
+      : result.kind === 'video' || result.kind === 'audio'
+        ? [
+            ['ORIGINAL', formatFileSize(result.originalSize)],
+            ['OUTPUT', formatFileSize(result.compressedSize)],
+            ['SAVED', reductionText],
+            ['TIME', `${result.durationMs} ms`],
+            ['FORMAT', result.format],
+            ['METHOD', result.methodUsed],
+          ]
+        : [
+            ['ORIGINAL', formatFileSize(result.originalSize)],
+            ['OUTPUT', formatFileSize(result.compressedSize)],
+            ['SAVED', reductionText],
+            ['DURATION', `${result.durationMs} ms`],
+            ['PAGES', String(result.pageCount)],
+            ['METHOD', result.methodUsed || result.mode],
+          ];
 
   for (const [label, value] of entries) {
     const wrapper = document.createElement('div');
@@ -314,9 +331,17 @@ function renderResultMetrics(result) {
   const titleElement = getElement('result-title');
   const summaryElement = getElement('result-summary');
   const downloadButton = getElement('download');
-  const extLabel = result.kind === 'image' ? result.format : 'PDF';
+  const isMedia = result.kind === 'video' || result.kind === 'audio';
+  const extLabel =
+    result.kind === 'image' || isMedia ? result.format : 'PDF';
 
-  if (result.wasReduced) {
+  if (isMedia) {
+    titleElement.textContent = 'Press complete.';
+    summaryElement.textContent = result.wasReduced
+      ? `Reduced by ${pctText} (${formatFileSize(result.bytesSaved)} saved) via ${result.methodUsed}.`
+      : `Output generated (${formatFileSize(result.compressedSize)}) via ${result.methodUsed}.`;
+    downloadButton.firstChild.textContent = `Download ${extLabel} `;
+  } else if (result.wasReduced) {
     titleElement.textContent = 'Press complete.';
     let summary = `Reduced by ${pctText} (${formatFileSize(result.bytesSaved)} saved) via ${result.methodUsed}.`;
     if (result.targetSizeBytes && result.targetAchieved === false) {
@@ -749,6 +774,8 @@ async function handleSelectedVideo(file) {
   getElement('video-options').hidden = false;
   getElement('audio-options').hidden = true;
   getElement('status').textContent = 'VIDEO READY';
+  updatePresetDescription();
+  updateWarnings();
 
   await syncMediaCapabilityControls({
     videoCodecSelect: getElement('video-codec'),
@@ -771,6 +798,8 @@ async function handleSelectedAudio(file) {
   getElement('audio-options').hidden = false;
   getElement('video-options').hidden = true;
   getElement('status').textContent = 'AUDIO READY';
+  updatePresetDescription();
+  updateWarnings();
 
   await syncMediaCapabilityControls({
     audioFormatSelect: getElement('audio-format'),
@@ -1216,16 +1245,25 @@ async function startCompression() {
 
       if (operationId !== activeOperationId) return;
       const baseName = selectedFile.name.replace(/\.[^.]+$/, '');
+      const bytesSaved = Math.max(0, selectedFile.size - out.bytes.byteLength);
+      const reductionPct =
+        selectedFile.size > 0
+          ? Number(((bytesSaved / selectedFile.size) * 100).toFixed(1))
+          : 0;
       compressionResult = {
         kind: selectedKind,
         bytes: out.bytes,
         mimeType: out.mimeType,
         extension: ext,
+        format: ext.toUpperCase(),
         wasReduced: out.bytes.byteLength < selectedFile.size,
-        originalBytes: selectedFile.size,
-        compressedBytes: out.bytes.byteLength,
+        originalSize: selectedFile.size,
+        compressedSize: out.bytes.byteLength,
+        bytesSaved,
+        reductionPct,
+        percentageSaved: reductionPct,
         durationMs: Math.round(performance.now() - t0),
-        method: methodLabel,
+        methodUsed: methodLabel,
         outputFilename: `${baseName}-gravipress.${ext}`,
       };
       updateProgress(100);
