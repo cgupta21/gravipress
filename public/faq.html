@@ -28,7 +28,7 @@
         <a href="/">App</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
-        <span class="version">V1.0</span>
+        <span class="version">V1.2.2</span>
       </nav>
     </header>
 
@@ -37,7 +37,7 @@
         <p class="eyebrow">DOCUMENTATION / FAQ</p>
         <h1>Frequently Asked Questions</h1>
         <p class="lead">
-          How Gravipress v1.0 compresses files locally in your browser and what
+          How Gravipress v1.2.2 compresses files locally in your browser and what
           limits apply.
         </p>
 
@@ -136,11 +136,16 @@
         <p>
           Yes. After initial load, click <strong>Enable Offline Mode</strong>
           to download and verify all required application assets (including
-          PDF.js workers, fonts, CMaps, image, batch, and archive engines) into
-          browser Cache Storage. Once <strong>Offline Ready</strong> is shown,
-          Gravipress can cold-start and compress files without an internet
-          connection. You can clear optional offline assets at any time with
-          <strong>Remove Offline Data</strong>. User files are never cached.
+          PDF.js workers, fonts, CMaps, image, batch, archive, and native
+          multimedia worker engines) into browser Cache Storage. Once
+          <strong>Offline Ready</strong> is shown, Gravipress can cold-start
+          and compress supported files without an internet connection (multimedia
+          support remains dependent on browser WebCodecs availability). You can
+          clear optional offline assets at any time with
+          <strong>Remove Offline Data</strong>. When a new version is available,
+          you can choose when to activate it via the update notification without
+          interrupting active compression; offline resources may need to be
+          prepared again after updating. User files are never cached.
         </p>
 
         <div class="callout">

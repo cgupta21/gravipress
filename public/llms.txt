@@ -12,7 +12,7 @@
 - [MIT License](https://github.com/cgupta21/gravipress/blob/release/v1.0-non-multimedia/LICENSE): Open-source MIT license for Gravipress.
 - [Third-Party Licenses](https://github.com/cgupta21/gravipress/blob/release/v1.0-non-multimedia/THIRD_PARTY_LICENSES.md): Runtime dependency copyright notices and license texts.
 
-## Supported Formats (v1.0)
+## Supported Formats (v1.2.2)
 
 - **PDF** (.pdf) — structural optimization and adaptive quality reduction via PDF.js and pdf-lib
 - **JPEG** (.jpg, .jpeg) — quality-based compression via browser Canvas API
@@ -22,20 +22,21 @@
 - **ZIP** (.zip) — DEFLATE compression for files and folders (levels 0, 1, 6, 9)
 - **GZIP** (.gz) — DEFLATE compression for single files
 - **Video (browser-dependent)** — VP8/VP9 WebM output via native WebCodecs and Mediabunny (no H.264 encoding)
-- **Audio (browser-dependent)** — Opus (WebM/OGG) and PCM WAV conversion via native WebCodecs (no AAC/MP3 encoding)
+- **Audio (browser-dependent)** — Opus (WebM/OGG) and PCM WAV conversion via native WebCodecs and Mediabunny (no AAC/MP3 encoding)
 
 ## Privacy
 
-All file processing is performed entirely within the user's browser. No user files, filenames, metadata, or compressed outputs are transmitted to external servers or stored in Cache Storage, `localStorage`, or `IndexedDB`. An optional Service Worker caches only static application assets when **Enable Offline Mode** is activated.
+All file processing is performed entirely within the user's browser. No user files, filenames, metadata, or compressed outputs are transmitted to external servers or stored in Cache Storage, `localStorage`, or `IndexedDB`. An optional Service Worker caches only static application assets (including lazy-loaded multimedia worker assets) when **Enable Offline Mode** is activated, and provides user-controlled PWA updates (offline resources may need re-enabling after an update).
 
 ## Processing Limits
 
 - PDF: up to 100 MB, up to 200 pages, 8192 px max side, 24 MP rendered page
 - Images: up to 50 MB per file, 8192 px max side, 32 MP decoded pixels
+- Native Video / Audio (WebCodecs): up to 100 MB input/output, 300 seconds max duration, 1920 px max video dimension
 - Batch queue: up to 20 files, 100 MB combined
 - ZIP archive: up to 250 files, 100 MB combined, 50 MB max single file, 12 folder levels
 - GZIP: single file up to 50 MB
 
 ## Technology
 
-Built with Vite, PDF.js (Mozilla), pdf-lib, and fflate. Deployed on Cloudflare Pages. No server-side processing.
+Built with Vite, PDF.js (Mozilla), pdf-lib, upng-js, fflate, browser WebCodecs, and Mediabunny (1.66.5, MPL-2.0). Deployed on Cloudflare Pages. No server-side processing, no FFmpeg, and no multimedia WASM binaries.
