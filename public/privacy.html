@@ -28,7 +28,7 @@
         <a href="/">App</a>
         <a href="/faq">FAQ</a>
         <a href="/terms">Terms</a>
-        <span class="version">V1.0</span>
+        <span class="version">V1.2.2</span>
       </nav>
     </header>
 
@@ -43,16 +43,16 @@
 
         <h2>1. Local File Processing</h2>
         <p>
-          All PDF, image, batch, ZIP, and GZIP operations run directly inside
-          your browser using client-side JavaScript, HTML5 Canvas, and Web
-          Workers. The Gravipress application does not intentionally upload,
-          transmit, or store your selected files on any remote compression
-          server.
+          All PDF, image, native WebCodecs audio/video, batch, ZIP, and GZIP
+          operations run directly inside your browser using client-side
+          JavaScript, HTML5 Canvas, WebCodecs, and Web Workers. The Gravipress
+          application does not intentionally upload, transmit, or store your
+          selected files on any remote compression server.
         </p>
 
         <h2>2. Analytics, Cookies, and Browser Storage</h2>
         <p>
-          Based on the Gravipress v1.0 codebase:
+          Based on the Gravipress v1.2.2 codebase:
         </p>
         <ul>
           <li>
@@ -74,9 +74,11 @@
           <li>
             <strong>Application asset caching (Offline Mode):</strong> A native
             Service Worker may store static application assets (HTML, CSS,
-            JavaScript, and PDF.js resources) in browser Cache Storage so the
-            app can load offline. You can clear optional offline assets at any
-            time using <strong>Remove Offline Data</strong>.
+            JavaScript, PDF.js, and lazy-loaded multimedia worker resources) in
+            browser Cache Storage so the app can load offline. You can clear
+            optional offline assets at any time using
+            <strong>Remove Offline Data</strong>. Offline resources may need to
+            be prepared again after an application update.
           </li>
           <li>
             <strong>Strict Content Security Policy:</strong> Response headers

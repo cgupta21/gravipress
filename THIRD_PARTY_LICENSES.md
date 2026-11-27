@@ -1,6 +1,6 @@
-# Third-Party Licenses & Notices (Gravipress v1.0)
+# Third-Party Licenses & Notices (Gravipress v1.2.2)
 
-Gravipress v1.0 performs client-side PDF, image, batch, and ZIP/GZIP archive compression directly inside the user's browser. This release does **not** bundle FFmpeg or any GPL-licensed multimedia codecs.
+Gravipress v1.2.2 performs client-side PDF, image, native WebCodecs audio/video, batch, and ZIP/GZIP archive compression directly inside the user's browser. Current production releases (`v1.0.0`–`v1.2.2`) do **not** bundle FFmpeg or any GPL-licensed multimedia binaries.
 
 ---
 
@@ -19,3 +19,7 @@ Gravipress v1.0 performs client-side PDF, image, batch, and ZIP/GZIP archive com
 ### Bundled PDF.js Asset Notices
 - **PDF.js CMaps**: `dist/pdfjs/cmaps/LICENSE` (Apache-2.0 / Adobe CMaps notices)
 - **PDF.js Standard Fonts**: `dist/pdfjs/standard_fonts/LICENSE_FOXIT` and `dist/pdfjs/standard_fonts/LICENSE_LIBERATION`
+
+### Historical Non-Production FFmpeg Source Archive
+- Earlier non-production experimental builds on branch `experimental/ffmpeg-wasm-core` generated FFmpeg 5.1.10 WebAssembly artifacts (`GPL-2.0-or-later`). Those binaries are not part of current Gravipress production releases.
+- Archival corresponding source packages, build scripts, manifests, checksums, and full license texts are hosted separately at: https://github.com/cgupta21/gravipress/releases/tag/ffmpeg-5.1.10-source-archive (technical archival record only; does not constitute formal legal clearance).

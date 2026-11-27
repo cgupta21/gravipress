@@ -12,7 +12,7 @@
 
 Privacy-first file compression, directly in your browser.
 
-[![Version](https://img.shields.io/badge/production-v1.0-ffc93c?labelColor=2b2d21)](https://gravipress.pages.dev/)
+[![Version](https://img.shields.io/badge/production-v1.2.2-ffc93c?labelColor=2b2d21)](https://gravipress.pages.dev/)
 [![CI](https://github.com/cgupta21/gravipress/actions/workflows/ci.yml/badge.svg?branch=release/v1.0-non-multimedia)](https://github.com/cgupta21/gravipress/actions/workflows/ci.yml?query=branch%3Arelease%2Fv1.0-non-multimedia)
 [![License](https://img.shields.io/badge/license-MIT-d9dadc?labelColor=2b2d21)](LICENSE)
 [![Privacy](https://img.shields.io/badge/privacy-local--first-2b2d21?labelColor=1c1e17)](https://gravipress.pages.dev/)
@@ -28,31 +28,33 @@ Privacy-first file compression, directly in your browser.
 
 ## Overview
 
-Gravipress is a browser-based file compression toolkit for PDF documents, raster images, batch queues, and lossless archives. Its industrial olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) hydraulic-press interface connects visual feedback with real compression progress. File processing takes place locally on the user's device, without an application server, account, or remote file storage.
+Gravipress is a browser-based file compression toolkit for PDF documents, raster images, native browser audio/video, batch queues, and lossless archives. Its industrial olive (`#2b2d21`), silver (`#d9dadc`), and yellow (`#ffc93c`) hydraulic-press interface connects visual feedback with real compression progress. File processing takes place locally on the user's device, without an application server, account, or remote file storage.
 
 ## Features
 
-| Capability         | Production v1.0                                                          |
-| ------------------ | ------------------------------------------------------------------------ |
-| PDF compression    | Structural optimization and adaptive image-based compression             |
-| Image optimization | Quality controls, aspect-ratio resizing, and target-size optimization    |
-| Batch processing   | Up to 20 files (100 MB combined), with progress, cancellation, and retry |
-| ZIP archives       | Files and nested folders with configurable DEFLATE compression levels    |
-| GZIP               | Single-file `.gz` stream compression                                     |
-| Local processing   | 100% browser-side execution and direct local downloads                   |
-
-Audio and video compression are separate development initiatives and are **not** included in production v1.0 (`release/v1.0-non-multimedia`).
+| Capability         | Production v1.2.2                                                               |
+| ------------------ | ------------------------------------------------------------------------------- |
+| PDF compression    | Structural optimization and adaptive image-based compression                    |
+| Image optimization | Quality controls, aspect-ratio resizing, and target-size optimization           |
+| Video compression  | Browser-native WebCodecs VP8 / VP9 WebM compression with Opus audio             |
+| Audio compression  | Browser-native WebCodecs Opus (WebM / OGG) and uncompressed PCM WAV conversion  |
+| Batch processing   | Up to 20 files (100 MB combined), with progress, cancellation, and retry        |
+| ZIP archives       | Files and nested folders with configurable DEFLATE compression levels           |
+| GZIP               | Single-file `.gz` stream compression                                            |
+| Local processing   | 100% browser-side execution, lazy-loaded engines, and direct local downloads    |
 
 ## Supported formats
 
-| Tool   | Formats                                                                        |
-| ------ | ------------------------------------------------------------------------------ |
-| PDF    | `.pdf`                                                                         |
-| Images | `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif` (browser-dependent encoding support) |
-| ZIP    | General files and nested folders; `.zip` output                                |
-| GZIP   | Single file; `.gz` output                                                      |
+| Tool   | Supported Input Formats                                                   | Output Formats                                                        |
+| ------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| PDF    | `.pdf`                                                                    | `.pdf`                                                                |
+| Images | `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`                                 | `.jpg`, `.png`, `.webp`, `.avif` (browser-dependent encoding support) |
+| Video  | `.mp4`, `.webm`, `.mov`, `.mkv` (`video/*`)                               | `.webm` (VP8 / VP9; browser-dependent WebCodecs support)              |
+| Audio  | `.mp3`, `.wav`, `.ogg`, `.m4a`, `.opus`, `.flac` (`audio/*`)              | `.webm` (Opus), `.ogg` (Opus), `.wav` (PCM)                           |
+| ZIP    | General files and nested folders                                          | `.zip`                                                                |
+| GZIP   | Single file                                                               | `.gz`                                                                 |
 
-Animated image optimization (animated GIF/APNG/animated WebP/AVIF) and standalone multimedia transcoding are not supported in production v1.0. Multimedia files may still be packaged as ordinary files inside ZIP or GZIP archives.
+Animated image optimization (animated GIF/APNG/animated WebP/AVIF) and H.264, AAC, or MP3 output encoding are not supported. Multimedia files may also be packaged as ordinary files inside ZIP or GZIP archives.
 
 ## Compression methods
 
@@ -117,7 +119,7 @@ Gravipress is an installable Progressive Web App (PWA) with optional, user-trigg
 - **Optional offline preparation (~5.8 MB):** Click **Enable Offline Mode** to download and verify all required static application assets (PDF.js workers, CMaps, standard fonts, image, batch, archive, and native multimedia engines) into browser Cache Storage. Assets are not bulk-downloaded on first visit.
 - **Offline compression:** Once **Offline Ready** is shown, PDF, image, batch, ZIP, GZIP, and browser-supported native video (VP8/VP9 WebM) / audio (Opus WebM/OGG, PCM WAV) work without an internet connection. User-selected files and compressed outputs are never cached.
 - **Browser & codec notes:** Native multimedia relies on browser-native WebCodecs (`VideoEncoder`/`AudioEncoder`) and `mediabunny` (`MPL-2.0`); H.264, AAC, and MP3 output encoding are not supported, and physical macOS/iOS Safari WebCodecs support has not been hardware-verified.
-- **Cache management & updates:** Use **Remove Offline Data** to clear optional offline assets while preserving the core shell. When a new build is available, **Update Available** notifies you without interrupting active compression; close all open Gravipress tabs and reopen to activate updates safely. Browsers may evict Cache Storage under low disk space; readiness is revalidated on load.
+- **Cache management & updates:** Use **Remove Offline Data** to clear optional offline assets while preserving the core shell. When a new build is detected, a top notification banner (**New version available — Update now**) lets you activate the update once active compression, batch/archive work, or offline preparation finishes (and requires other open Gravipress tabs/windows to be idle or closed). Offline resources may need to be prepared again after updating. Browsers may evict Cache Storage under low disk space; readiness is revalidated on load.
 
 ## Technology stack
 
@@ -127,6 +129,7 @@ Gravipress is an installable Progressive Web App (PWA) with optional, user-trigg
 | Build tooling        | Vite (`vite` `^6.0.0`)                                            |
 | PDF processing       | `pdf-lib` (`^1.17.1`), `pdfjs-dist` (`^6.5.438`)                  |
 | Image processing     | HTML5 Canvas API, `upng-js` (`^2.1.0`)                            |
+| Audio / Video        | Browser WebCodecs API, `mediabunny` (`1.66.5`, MPL-2.0), Web Workers |
 | Archive processing   | `fflate` (`^0.8.3`), Web Workers                                  |
 | Testing & formatting | Node.js test runner, Playwright (`^1.65.1`), Prettier (`^3.10.1`) |
 | Production hosting   | Cloudflare Pages                                                  |
@@ -188,12 +191,13 @@ The generated static `dist/` output can also be hosted on any compatible static 
 | ----------------------- | ----------------------------------------------------------: |
 | PDF input               | 100 MB / 200 pages / 8192 px max side / 24 MP rendered page |
 | Individual image        |             50 MB / 8192 px max side / 32 MP decoded pixels |
+| Native video / audio    | 100 MB input & output / 300 seconds / 1920 px max video side |
 | Batch queue             |                                  20 files / 100 MB combined |
 | Archive input           |                                 250 files / 100 MB combined |
 | Individual archive file |                                                       50 MB |
 | Archive folder depth    |                                                   12 levels |
 
-Mobile devices may have lower practical memory capacity. Chromium, Firefox, and WebKit have been covered by earlier automated testing; this does not guarantee identical behavior on every device or OS release.
+Mobile devices may have lower practical memory capacity. Chromium and Firefox configurations have been covered in automated testing; multimedia support depends on browser-native WebCodecs availability, and physical macOS/iOS Safari hardware testing has not been completed.
 
 **Important:** Rasterized PDF compression (`Balanced` / `Maximum` on image-heavy PDFs) can remove searchable text, links, forms, and accessibility structure. Encrypted PDFs are rejected, and processing signed PDFs may invalidate digital signatures. Image re-encoding strips EXIF/IPTC/XMP metadata and normalizes output to sRGB. AVIF output depends on browser-native `canvas.toBlob('image/avif')` support.
 
@@ -203,17 +207,19 @@ Mobile devices may have lower practical memory capacity. Chromium, Firefox, and 
 gravipress/
 ├── public/                     # Static assets, icons, _headers, licenses, sitemap.xml
 ├── src/
-│   ├── components/             # Batch and archive workspace UI controllers
+│   ├── components/             # Batch, archive, and media workspace UI controllers
 │   ├── config/                 # Presets and processing limits
-│   ├── engines/                # PDF, image, batch, and archive engines
+│   ├── engines/                # PDF, image, batch, archive, and native-media engines
 │   ├── state/                  # Processing queue state
 │   ├── utils/                  # File, image, path, and download helpers
-│   ├── workers/                # Off-main-thread ZIP/GZIP Web Worker
-│   ├── main.js                 # Application orchestration
-│   └── style.css               # Industrial palette and hydraulic press UI
+│   ├── workers/                # Web Workers (archive.worker.js, native-media.worker.js)
+│   ├── main.js                 # Application orchestration and safe PWA update lifecycle
+│   ├── style.css               # Industrial palette and hydraulic press UI
+│   └── sw-template.js          # Service worker offline cache and cross-client update guard
 ├── tests/                      # Node unit tests and Playwright E2E suites
 ├── index.html                  # Application entry point and SEO metadata
 ├── LICENSE                     # MIT application license
+├── SECURITY.md                 # Vulnerability reporting guidance
 ├── package.json                # Dependencies and npm scripts
 ├── playwright.config.js        # Browser test configuration
 ├── THIRD_PARTY_LICENSES.md     # Third-party dependency notices
@@ -224,16 +230,15 @@ gravipress/
 
 - Improve accessibility, mobile usability, and browser compatibility.
 - Expand documentation, performance testing, and search discoverability.
-- Evaluate offline support.
-- Complete multimedia testing and dependency licensing review before any future multimedia release.
+- Verify WebCodecs multimedia behavior on physical macOS and iOS Safari hardware.
 
 ## Contributing
 
-Bug reports, feature suggestions, and pull requests are welcome. For substantial changes, open an issue first to discuss the proposed approach. Include reproduction steps and browser details when reporting bugs, and use non-sensitive test files. Run `npm test` and `npm run format:check` before submitting changes.
+Bug reports, feature suggestions, and pull requests are welcome. For substantial changes, open an issue first to discuss the proposed approach. Include reproduction steps and browser details when reporting bugs, and use non-sensitive test files. See [SECURITY.md](SECURITY.md) for security vulnerability reporting. Run `npm test` and `npm run format:check` before submitting changes.
 
 ## License
 
-Gravipress v1.0 is licensed under the [MIT License](LICENSE). See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) and `public/licenses/` for third-party copyright notices and license texts.
+Gravipress v1.2.2 is licensed under the [MIT License](LICENSE). See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) and `public/licenses/` for third-party copyright notices and license texts.
 
 ---
 
