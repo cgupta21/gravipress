@@ -63,7 +63,7 @@
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "Any (Web Browser)",
         "browserRequirements": "Requires JavaScript and HTML5 Web Workers",
-        "softwareVersion": "1.2.1",
+        "softwareVersion": "1.2.2",
         "description": "A local-first browser compression utility for PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives.",
         "featureList": [
           "Client-side PDF compression",
@@ -105,6 +105,25 @@
     </header>
 
     <main class="shell">
+      <div
+        class="update-banner"
+        id="update-banner"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
+        <div class="update-banner-main">
+          <span class="update-banner-badge" aria-hidden="true">UPDATE</span>
+          <span class="update-banner-label">New version available —</span>
+          <button class="update-banner-btn" id="update-now" type="button">
+            Update now
+          </button>
+        </div>
+        <span class="update-banner-note" id="update-banner-note">
+          Unsaved results stay intact until you update. Offline Mode assets will need re-enabling after update.
+        </span>
+      </div>
+
       <section class="hero">
         <div>
           <p class="eyebrow"><i></i> THE FILE COMPRESSION UTILITY</p>

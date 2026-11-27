@@ -68,6 +68,17 @@ let useCustomQuality = false;
 let activeOperationId = 0;
 let activeAbortController = null;
 let isCompressing = false;
+let isPreparingOffline = false;
+let isApplyingUpdate = false;
+let remoteUpdateLockUntil = 0;
+
+function isOperationActive() {
+  return Boolean(isCompressing || isPreparingOffline || isApplyingUpdate);
+}
+
+function isRemoteUpdateLocked() {
+  return Date.now() < remoteUpdateLockUntil;
+}
 
 let batchMode = false;
 const batchQueue = createProcessingQueue('Balanced');
@@ -1158,7 +1169,7 @@ async function startArchiveCompression() {
 }
 
 async function startCompression() {
-  if (isCompressing) {
+  if (isCompressing || isApplyingUpdate || isRemoteUpdateLocked()) {
     return;
   }
 
@@ -1709,12 +1720,52 @@ if ('serviceWorker' in navigator) {
   const offlinePrepareBtn = getElement('offline-prepare');
   const offlineRemoveBtn = getElement('offline-remove');
   const updateAppBtn = getElement('update-app');
+  const updateBanner = getElement('update-banner');
+  const updateNowBtn = getElement('update-now');
 
   let swRegistration = null;
   let waitingWorker = null;
   let reloadingForUpdate = false;
+  let hasReloadedForUpdate = false;
+  let updateApplyTimer = null;
+  let lastUpdateCheckAt = 0;
+  const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
   const formatMB = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+  function setUpdateButtonsBusy(busy) {
+    if (updateNowBtn) {
+      updateNowBtn.disabled = busy;
+      updateNowBtn.textContent = busy ? 'Updating…' : 'Update now';
+      updateNowBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+    if (updateAppBtn) {
+      updateAppBtn.disabled = busy;
+      updateAppBtn.textContent = busy ? 'Updating…' : 'Update Available';
+      updateAppBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+  }
+
+  function showUpdateAvailable(worker) {
+    if (!worker || worker.state === 'redundant') return;
+    waitingWorker = worker;
+    if (updateBanner) updateBanner.hidden = false;
+    if (updateAppBtn) updateAppBtn.hidden = false;
+    setUpdateButtonsBusy(false);
+  }
+
+  function clearUpdateAvailable() {
+    waitingWorker = null;
+    isApplyingUpdate = false;
+    reloadingForUpdate = false;
+    if (updateApplyTimer) {
+      clearTimeout(updateApplyTimer);
+      updateApplyTimer = null;
+    }
+    if (updateBanner) updateBanner.hidden = true;
+    if (updateAppBtn) updateAppBtn.hidden = true;
+    setUpdateButtonsBusy(false);
+  }
 
   function applyOfflineStatus(status) {
     if (!offlineBar || !offlineStatus) return;
@@ -1741,35 +1792,132 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.controller?.postMessage({ type: 'GET_OFFLINE_STATUS' });
   }
 
+  function triggerUpdateApply() {
+    if (!waitingWorker || waitingWorker.state === 'redundant') {
+      clearUpdateAvailable();
+      return;
+    }
+    if (isCompressing || isPreparingOffline) {
+      openDialog(
+        'Operation in progress',
+        'Please wait for the active compression or offline preparation to finish or cancel it before updating.'
+      );
+      return;
+    }
+    if (isApplyingUpdate) return;
+
+    isApplyingUpdate = true;
+    reloadingForUpdate = true;
+    setUpdateButtonsBusy(true);
+
+    if (updateApplyTimer) clearTimeout(updateApplyTimer);
+    updateApplyTimer = setTimeout(() => {
+      updateApplyTimer = null;
+      if (!hasReloadedForUpdate && isApplyingUpdate) {
+        isApplyingUpdate = false;
+        reloadingForUpdate = false;
+        setUpdateButtonsBusy(false);
+      }
+    }, 5000);
+
+    try {
+      waitingWorker.postMessage({ type: 'APPLY_UPDATE' });
+    } catch {
+      if (updateApplyTimer) {
+        clearTimeout(updateApplyTimer);
+        updateApplyTimer = null;
+      }
+      isApplyingUpdate = false;
+      reloadingForUpdate = false;
+      setUpdateButtonsBusy(false);
+    }
+  }
+
+  function checkForUpdatesIfDue() {
+    if (!swRegistration || isOperationActive() || navigator.onLine === false) return;
+    const now = Date.now();
+    if (now - lastUpdateCheckAt < UPDATE_CHECK_INTERVAL_MS) return;
+    lastUpdateCheckAt = now;
+    swRegistration.update().catch(() => {});
+  }
+
   navigator.serviceWorker.addEventListener('message', (event) => {
     const data = event.data || {};
     if (data.type === 'OFFLINE_STATUS') {
+      isPreparingOffline = false;
       applyOfflineStatus(data);
     } else if (data.type === 'OFFLINE_PROGRESS') {
+      isPreparingOffline = true;
       const pct = Math.round((data.cachedCount / Math.max(1, data.totalCount)) * 100);
       offlineStatus.textContent = `Preparing offline… ${pct}% (${data.cachedCount}/${data.totalCount})`;
       offlinePrepareBtn.disabled = true;
       offlineRemoveBtn.hidden = true;
     } else if (data.type === 'OFFLINE_ERROR') {
+      isPreparingOffline = false;
       offlineStatus.textContent = `Preparation failed (${data.cachedCount}/${data.totalCount})`;
       offlinePrepareBtn.textContent = 'Retry Preparation';
       offlinePrepareBtn.hidden = false;
       offlinePrepareBtn.disabled = false;
       offlineRemoveBtn.hidden = data.optionalCachedCount === 0;
+    } else if (data.type === 'CHECK_BUSY_FOR_UPDATE' && typeof data.requestId === 'string') {
+      const busy = Boolean(isCompressing || isPreparingOffline || isApplyingUpdate);
+      if (!busy) {
+        remoteUpdateLockUntil = Date.now() + 2500;
+      }
+      const target = event.source || navigator.serviceWorker.controller;
+      target?.postMessage({
+        type: 'BUSY_STATUS',
+        requestId: data.requestId,
+        busy,
+      });
+    } else if (data.type === 'UPDATE_BLOCKED_OTHER_CLIENTS') {
+      isApplyingUpdate = false;
+      reloadingForUpdate = false;
+      if (updateApplyTimer) {
+        clearTimeout(updateApplyTimer);
+        updateApplyTimer = null;
+      }
+      setUpdateButtonsBusy(false);
+      openDialog(
+        'Update Deferred',
+        data.busyDetected
+          ? 'Another Gravipress tab or window is currently compressing or preparing offline data. Please finish or cancel that operation and close other Gravipress windows before updating.'
+          : 'Other Gravipress tabs or windows are open. Please close all other Gravipress tabs and windows, then click Update now again (or reopen the app) to activate the update safely.'
+      );
     }
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloadingForUpdate) {
+    if (updateApplyTimer) {
+      clearTimeout(updateApplyTimer);
+      updateApplyTimer = null;
+    }
+    if (
+      reloadingForUpdate &&
+      !hasReloadedForUpdate &&
+      !isCompressing &&
+      !isPreparingOffline
+    ) {
+      hasReloadedForUpdate = true;
       window.location.reload();
     } else {
+      isApplyingUpdate = false;
+      reloadingForUpdate = false;
       requestOfflineStatus();
     }
   });
 
   if (offlinePrepareBtn) {
     offlinePrepareBtn.onclick = () => {
-      if (!navigator.serviceWorker.controller) return;
+      if (
+        !navigator.serviceWorker.controller ||
+        isApplyingUpdate ||
+        isCompressing ||
+        isRemoteUpdateLocked()
+      ) {
+        return;
+      }
+      isPreparingOffline = true;
       offlinePrepareBtn.disabled = true;
       navigator.serviceWorker.controller.postMessage({ type: 'PREPARE_OFFLINE' });
     };
@@ -1777,43 +1925,42 @@ if ('serviceWorker' in navigator) {
 
   if (offlineRemoveBtn) {
     offlineRemoveBtn.onclick = () => {
+      if (isApplyingUpdate || isCompressing) return;
       navigator.serviceWorker.controller?.postMessage({ type: 'REMOVE_OFFLINE_DATA' });
     };
   }
 
-  if (updateAppBtn) {
-    updateAppBtn.onclick = () => {
-      if (!waitingWorker) return;
-      if (isOperationActive()) {
-        openDialog(
-          'Compression in progress',
-          'Please wait for the active compression to finish or cancel it before updating.'
-        );
-        return;
-      }
-      openDialog(
-        'Update Ready',
-        'A new version of Gravipress is downloaded and waiting. Close all open Gravipress tabs and reopen the app to activate the update safely.'
-      );
-    };
+  if (updateNowBtn) {
+    updateNowBtn.onclick = triggerUpdateApply;
   }
+
+  if (updateAppBtn) {
+    updateAppBtn.onclick = triggerUpdateApply;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkForUpdatesIfDue();
+    }
+  });
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
       .then((reg) => {
         swRegistration = reg;
+        lastUpdateCheckAt = Date.now();
         if (reg.waiting) {
-          waitingWorker = reg.waiting;
-          updateAppBtn.hidden = false;
+          showUpdateAvailable(reg.waiting);
         }
         reg.addEventListener('updatefound', () => {
           const installing = reg.installing;
           if (!installing) return;
           installing.addEventListener('statechange', () => {
             if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              waitingWorker = installing;
-              updateAppBtn.hidden = false;
+              showUpdateAvailable(installing);
+            } else if (installing.state === 'redundant' && installing === waitingWorker) {
+              clearUpdateAvailable();
             }
           });
         });
