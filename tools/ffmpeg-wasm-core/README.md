@@ -2,6 +2,12 @@
 
 This isolated directory contains the Docker and toolchain configuration to build a secure, reproducible, single-threaded WebAssembly core based on **FFmpeg 5.1.10 LTS**.
 
+> **Archival Notice (Non-Production) & Published Corresponding Source Archive:**
+> This branch and directory are preserved solely for historical reference and GPL/LGPL source-availability compliance. Gravipress production (`v1.2.2+`) does **not** use FFmpeg or WebAssembly multimedia binaries (it uses native browser WebCodecs + Mediabunny).
+>
+> Complete source-only archival materials (corresponding source tarballs, build scripts, manifests, SHA-256 checksums, and full GPL-2.0 / dependency license texts) for all historical GitHub Actions builds of this core are publicly hosted at:
+> https://github.com/cgupta21/gravipress/releases/tag/ffmpeg-5.1.10-source-archive
+
 ---
 
 ### 1. Pinned Source Inventory & Provenance
