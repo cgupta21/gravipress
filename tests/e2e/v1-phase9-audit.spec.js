@@ -40,7 +40,7 @@ test.describe('Phase 9: SEO, Accessibility & Responsive Audit (v1.0)', () => {
     const jsonLdRaw = await page.locator('script[type="application/ld+json"]').textContent();
     const jsonLd = JSON.parse(jsonLdRaw);
     expect(jsonLd['@type']).toBe('WebApplication');
-    expect(jsonLd.softwareVersion).toBe('1.1.1');
+    expect(jsonLd.softwareVersion).toBe('1.2.0');
 
     // robots.txt (sitemap deferred until production domain is confirmed)
     const robotsResp = await page.request.get('/robots.txt');

@@ -51,9 +51,10 @@
 
         <h2>What formats and file limits are enforced?</h2>
         <p>
-          Gravipress v1.0 supports PDF, JPEG, PNG, WebP, AVIF (browser
-          dependent), ZIP, and GZIP. Audio (MP3) and video (MP4) compression are
-          not supported in v1.0. Enforced limits:
+          Gravipress supports PDF, JPEG, PNG, WebP, AVIF (browser dependent),
+          ZIP, GZIP, plus browser-dependent native WebCodecs video (VP8/VP9
+          WebM) and audio (Opus WebM/OGG, PCM WAV). H.264, AAC, and MP3 output
+          encoding are not supported. Enforced limits:
         </p>
         <table>
           <thead>
@@ -82,6 +83,10 @@
             <tr>
               <td>GZIP Archive</td>
               <td>Single file up to 50 MB</td>
+            </tr>
+            <tr>
+              <td>Native Video / Audio (WebCodecs)</td>
+              <td>100 MB max input/output, 300s max duration, 1920 px max video side</td>
             </tr>
           </tbody>
         </table>
