@@ -161,6 +161,62 @@ async function prepareOfflineAssets() {
   return preparingPromise;
 }
 
+const pendingBusyChecks = new Map();
+
+async function checkOtherClientsSafeForUpdate(sourceClient) {
+  const clients = await self.clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true,
+  });
+  const otherClients = clients.filter(
+    (client) => !sourceClient || client.id !== sourceClient.id
+  );
+  if (otherClients.length === 0) {
+    return { safe: true, busyDetected: false, otherCount: 0 };
+  }
+
+  const requestId = `chk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const responses = new Map();
+
+  const waitPromise = new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingBusyChecks.delete(requestId);
+      resolve();
+    }, 450);
+
+    pendingBusyChecks.set(requestId, (clientId, busy) => {
+      responses.set(clientId, Boolean(busy));
+      if (responses.size >= otherClients.length) {
+        clearTimeout(timer);
+        pendingBusyChecks.delete(requestId);
+        resolve();
+      }
+    });
+  });
+
+  for (const client of otherClients) {
+    client.postMessage({ type: 'CHECK_BUSY_FOR_UPDATE', requestId });
+  }
+
+  await waitPromise;
+
+  let busyDetected = false;
+  let allResponded = true;
+  for (const client of otherClients) {
+    if (!responses.has(client.id)) {
+      allResponded = false;
+    } else if (responses.get(client.id)) {
+      busyDetected = true;
+    }
+  }
+
+  return {
+    safe: allResponded && !busyDetected,
+    busyDetected,
+    otherCount: otherClients.length,
+  };
+}
+
 self.addEventListener('message', (event) => {
   const data = event.data || {};
   if (data.type === 'GET_OFFLINE_STATUS') {
@@ -174,8 +230,25 @@ self.addEventListener('message', (event) => {
         .then(() => computeOfflineStatus())
         .then((s) => broadcast(s))
     );
+  } else if (data.type === 'BUSY_STATUS' && data.requestId) {
+    const resolver = pendingBusyChecks.get(data.requestId);
+    if (resolver && event.source) {
+      resolver(event.source.id, data.busy);
+    }
   } else if (data.type === 'APPLY_UPDATE') {
-    self.skipWaiting();
+    event.waitUntil(
+      checkOtherClientsSafeForUpdate(event.source).then((result) => {
+        if (result.safe) {
+          return self.skipWaiting();
+        }
+        event.source?.postMessage({
+          type: 'UPDATE_BLOCKED_OTHER_CLIENTS',
+          otherCount: result.otherCount,
+          busyDetected: result.busyDetected,
+        });
+        return undefined;
+      })
+    );
   }
 });
 
