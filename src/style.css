@@ -595,6 +595,11 @@ legend {
 
 .machine-area .micro {
   color: #b4b7aa;
+  background: var(--olive);
+}
+
+.machine-area .status {
+  background: var(--olive);
 }
 
 .machine {
@@ -969,12 +974,16 @@ footer {
 .footer-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: 4px 16px;
   flex-basis: 100%;
   font-size: 12px;
 }
 
 .footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 6px 4px;
   color: var(--olive);
   text-decoration: underline;
   text-underline-offset: 4px;
