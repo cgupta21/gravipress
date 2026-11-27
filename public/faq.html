@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frequently Asked Questions — Gravipress</title>
+    <meta
+      name="description"
+      content="Answers about Gravipress local file privacy, supported formats, enforced limits, PDF rasterization, EXIF removal, AVIF support, and offline behavior."
+    />
+    <meta name="theme-color" content="#2b2d21" />
+    <link rel="canonical" href="https://gravipress.pages.dev/faq" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/legal.css" />
+  </head>
+  <body>
+    <header class="shell nav">
+      <a class="brand" href="/" aria-label="Gravipress home">
+        <img
+          class="brand-logo"
+          src="/brand/logo-horizontal-light.png"
+          alt="Gravipress"
+          width="250"
+          height="44"
+        />
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="/">App</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <span class="version">V1.0</span>
+      </nav>
+    </header>
+
+    <main class="shell">
+      <article class="doc">
+        <p class="eyebrow">DOCUMENTATION / FAQ</p>
+        <h1>Frequently Asked Questions</h1>
+        <p class="lead">
+          How Gravipress v1.0 compresses files locally in your browser and what
+          limits apply.
+        </p>
+
+        <h2>Are my files uploaded to a server?</h2>
+        <p>
+          No. All parsing, rendering, image encoding, PDF optimization, and
+          ZIP/GZIP packaging execute locally in your browser. Gravipress has no
+          backend compression server and no user accounts. See the
+          <a href="/privacy">Privacy Policy</a> for static hosting details.
+        </p>
+
+        <h2>What formats and file limits are enforced?</h2>
+        <p>
+          Gravipress v1.0 supports PDF, JPEG, PNG, WebP, AVIF (browser
+          dependent), ZIP, and GZIP. Audio (MP3) and video (MP4) compression are
+          not supported in v1.0. Enforced limits:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Mode / Resource</th>
+              <th>Enforced Limit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PDF</td>
+              <td>100 MB max size, 200 pages max, 8192 px max side, 24 MP max rendered page</td>
+            </tr>
+            <tr>
+              <td>Images (JPEG, PNG, WebP, AVIF)</td>
+              <td>50 MB max size, 8192 px max side, 32 MP max decoded pixels</td>
+            </tr>
+            <tr>
+              <td>Batch Queue</td>
+              <td>20 files max, 100 MB combined input</td>
+            </tr>
+            <tr>
+              <td>ZIP Archive / Folders</td>
+              <td>250 files max, 100 MB combined input, 50 MB max single file, 12 folder levels</td>
+            </tr>
+            <tr>
+              <td>GZIP Archive</td>
+              <td>Single file up to 50 MB</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Why can't some files be compressed further?</h2>
+        <p>
+          Files that are already compressed (such as pre-optimized JPEGs, PNGs,
+          ZIPs, or encrypted/random binary data) often have little redundant data
+          left. When Gravipress cannot produce a smaller valid output, it retains
+          the original file instead of enlarging it.
+        </p>
+
+        <h2>How do PDF presets and rasterization work?</h2>
+        <p>
+          <strong>Light</strong> mode applies structure-only optimization (object
+          streams) and preserves selectable text, links, and forms.
+          <strong>Balanced</strong> (~144 DPI) and <strong>Maximum</strong> (~96
+          DPI) try structural optimization first and, for image-heavy PDFs, may
+          rasterize pages into compressed JPEGs. Rasterized pages cannot retain
+          selectable text, forms, hyperlinks, or accessibility tags.
+        </p>
+
+        <h2>What happens with encrypted or digitally signed PDFs?</h2>
+        <p>
+          Password-protected or encrypted PDFs are rejected because they cannot
+          be safely rewritten without decryption. Modifying or rasterizing a
+          digitally signed PDF may invalidate its cryptographic signature—always
+          keep your original signed copy.
+        </p>
+
+        <h2>Does image compression remove EXIF metadata?</h2>
+        <p>
+          Yes. Re-encoding an image through the browser Canvas API strips EXIF,
+          IPTC, and XMP metadata (such as camera model and GPS coordinates) and
+          normalizes color output to sRGB.
+        </p>
+
+        <h2>Why does AVIF work in some browsers and not others?</h2>
+        <p>
+          AVIF encoding relies on your browser's native
+          <code>canvas.toBlob('image/avif')</code> implementation. Browsers
+          without built-in AVIF encoding support cannot output compressed AVIF
+          files.
+        </p>
+
+        <h2>Does Gravipress work offline?</h2>
+        <p>
+          Once the page is loaded in your browser tab, compression continues to
+          work without an internet connection. However, Gravipress v1.0 does not
+          currently install a Service Worker for offline cold-starts after
+          closing the tab.
+        </p>
+
+        <div class="callout">
+          Found a bug? Report it on
+          <a
+            href="https://github.com/cgupta21/gravipress/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub Issues</a
+          >. Do not attach confidential files or personal information to public
+          issues.
+        </div>
+      </article>
+
+      <footer>
+        <nav class="footer-links" aria-label="Legal and support">
+          <a href="/">Back to Gravipress</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/terms">Terms of Use</a>
+          <a
+            href="https://github.com/cgupta21/gravipress/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Report an issue</a
+          >
+        </nav>
+      </footer>
+      <p class="notice">
+        Do not attach confidential files or personal information to public GitHub
+        issues.
+      </p>
+    </main>
+
+    <div class="hazard"></div>
+  </body>
+</html>

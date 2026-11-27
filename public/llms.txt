@@ -28,10 +28,11 @@ All file processing is performed entirely within the user's browser. No files, m
 
 ## Processing Limits
 
-- PDF: up to 200 MB, up to 2,000 pages
-- Images: up to 50 MB per file
-- Batch queue: up to 20 files, up to 20 MB each
-- ZIP archive: up to 500 files, up to 500 MB total (browser memory dependent)
+- PDF: up to 100 MB, up to 200 pages, 8192 px max side, 24 MP rendered page
+- Images: up to 50 MB per file, 8192 px max side, 32 MP decoded pixels
+- Batch queue: up to 20 files, 100 MB combined
+- ZIP archive: up to 250 files, 100 MB combined, 50 MB max single file, 12 folder levels
+- GZIP: single file up to 50 MB
 
 ## Technology
 

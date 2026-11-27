@@ -918,6 +918,20 @@ footer {
   font-size: 10px;
 }
 
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  flex-basis: 100%;
+  font-size: 12px;
+}
+
+.footer-links a {
+  color: var(--olive);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .notice {
   font-size: 11px;
   color: #55594c;

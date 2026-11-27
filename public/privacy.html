@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy — Gravipress</title>
+    <meta
+      name="description"
+      content="How Gravipress handles files locally in your browser, zero-analytics and zero-cookie operation, and Cloudflare Pages static hosting disclosures."
+    />
+    <meta name="theme-color" content="#2b2d21" />
+    <link rel="canonical" href="https://gravipress.pages.dev/privacy" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/legal.css" />
+  </head>
+  <body>
+    <header class="shell nav">
+      <a class="brand" href="/" aria-label="Gravipress home">
+        <img
+          class="brand-logo"
+          src="/brand/logo-horizontal-light.png"
+          alt="Gravipress"
+          width="250"
+          height="44"
+        />
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="/">App</a>
+        <a href="/faq">FAQ</a>
+        <a href="/terms">Terms</a>
+        <span class="version">V1.0</span>
+      </nav>
+    </header>
+
+    <main class="shell">
+      <article class="doc">
+        <p class="eyebrow">DOCUMENTATION / PRIVACY</p>
+        <h1>Privacy Policy</h1>
+        <p class="lead">
+          Gravipress is a static, browser-based compression utility designed to
+          process files locally on your device.
+        </p>
+
+        <h2>1. Local File Processing</h2>
+        <p>
+          All PDF, image, batch, ZIP, and GZIP operations run directly inside
+          your browser using client-side JavaScript, HTML5 Canvas, and Web
+          Workers. The Gravipress application does not intentionally upload,
+          transmit, or store your selected files on any remote compression
+          server.
+        </p>
+
+        <h2>2. Analytics, Cookies, and Browser Storage</h2>
+        <p>
+          Based on the Gravipress v1.0 codebase:
+        </p>
+        <ul>
+          <li>
+            <strong>No analytics or tracking:</strong> Gravipress does not load
+            third-party analytics, advertising, or telemetry scripts.
+          </li>
+          <li>
+            <strong>No cookies:</strong> Gravipress does not set HTTP cookies or
+            <code>document.cookie</code> values.
+          </li>
+          <li>
+            <strong>No persistent file storage:</strong> Selected files and
+            compressed outputs are not written to <code>localStorage</code> or
+            <code>IndexedDB</code>. Files are held in browser memory and
+            temporary <code>blob:</code> URLs, which are released when you reset
+            the workspace or leave the page.
+          </li>
+          <li>
+            <strong>Strict Content Security Policy:</strong> Response headers
+            restrict <code>connect-src</code> to <code>'self'</code>,
+            <code>blob:</code>, and <code>data:</code>.
+          </li>
+        </ul>
+
+        <h2>3. Static Hosting &amp; Infrastructure Logs</h2>
+        <p>
+          Gravipress is delivered as a static website on
+          <strong>Cloudflare Pages</strong>. When your browser requests the
+          application's HTML, CSS, JavaScript, or icon assets over HTTPS,
+          Cloudflare's network infrastructure may process and log standard
+          HTTP request metadata (such as IP address, user-agent, requested URL,
+          and timestamp) for security, routing, and DDoS protection.
+        </p>
+        <p>
+          For details on how Cloudflare handles infrastructure data, review the
+          <a
+            href="https://www.cloudflare.com/privacypolicy/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Cloudflare Privacy Policy</a
+          >.
+        </p>
+
+        <h2>4. Public Issue Reports</h2>
+        <p>
+          If you report a bug on
+          <a
+            href="https://github.com/cgupta21/gravipress/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub Issues</a
+          >, any text or attachments you submit become public. Do not attach
+          confidential files or personal information to public issues.
+        </p>
+      </article>
+
+      <footer>
+        <nav class="footer-links" aria-label="Legal and support">
+          <a href="/">Back to Gravipress</a>
+          <a href="/faq">FAQ</a>
+          <a href="/terms">Terms of Use</a>
+          <a
+            href="https://github.com/cgupta21/gravipress/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Report an issue</a
+          >
+        </nav>
+      </footer>
+      <p class="notice">
+        Do not attach confidential files or personal information to public GitHub
+        issues.
+      </p>
+    </main>
+
+    <div class="hazard"></div>
+  </body>
+</html>
