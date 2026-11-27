@@ -13,11 +13,16 @@
 Privacy-first file compression, directly in your browser.
 
 [![Version](https://img.shields.io/badge/production-v1.0-ffc93c?labelColor=2b2d21)](https://gravipress.pages.dev/)
+[![CI](https://github.com/cgupta21/gravipress/actions/workflows/ci.yml/badge.svg?branch=release/v1.0-non-multimedia)](https://github.com/cgupta21/gravipress/actions/workflows/ci.yml?query=branch%3Arelease%2Fv1.0-non-multimedia)
 [![License](https://img.shields.io/badge/license-MIT-d9dadc?labelColor=2b2d21)](LICENSE)
 [![Privacy](https://img.shields.io/badge/privacy-local--first-2b2d21?labelColor=1c1e17)](https://gravipress.pages.dev/)
 [![Hosting](https://img.shields.io/badge/hosting-Cloudflare%20Pages-ffc93c?labelColor=2b2d21)](https://gravipress.pages.dev/)
 
-[**Launch Gravipress**](https://gravipress.pages.dev/) · [Report an issue](https://github.com/cgupta21/gravipress/issues) · [Source code](https://github.com/cgupta21/gravipress)
+[**Launch Gravipress**](https://gravipress.pages.dev/) · [Report an issue](https://github.com/cgupta21/gravipress/issues) · [Source code](https://github.com/cgupta21/gravipress/tree/release/v1.0-non-multimedia)
+
+<br />
+
+<img alt="Gravipress social preview" src="public/social-preview.png" width="720" />
 
 </div>
 
@@ -71,6 +76,21 @@ Selected historical archive benchmarks using Maximum ZIP compression (DEFLATE le
 | 256 KB random binary  |        0.0% |
 
 These are previously recorded fixture-specific measurements, not guarantees or newly executed benchmarks. Results vary with content, prior compression, device, and browser. Already-compressed files may see little or no size reduction.
+
+### Lighthouse & PageSpeed Insights
+
+Dated laboratory results recorded via Google PageSpeed Insights on **27 November 2026** for [`https://gravipress.pages.dev/`](https://gravipress.pages.dev/):
+
+| Metric / Category | Mobile | Desktop |
+| ----------------- | -----: | ------: |
+| Performance       |    100 |     100 |
+| Accessibility     |    100 |     100 |
+| Best Practices    |    100 |     100 |
+| SEO               |    100 |     100 |
+| Agentic browsing  |    3/3 |     3/3 |
+| LCP               |   0.8s |    0.2s |
+
+These are dated laboratory measurements under standardized PageSpeed Insights conditions; real-world field timings vary by device, network, and browser.
 
 ## Privacy and architecture
 
