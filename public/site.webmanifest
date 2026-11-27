@@ -1,7 +1,8 @@
 {
+  "id": "/",
   "name": "Gravipress",
   "short_name": "Gravipress",
-  "description": "Local-first file compression utility \u2014 UI prototype",
+  "description": "Local-first browser utility to compress PDFs, images, batch queues, and ZIP/GZIP archives without uploading files.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

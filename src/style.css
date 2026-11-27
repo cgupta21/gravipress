@@ -154,6 +154,30 @@ input:focus-visible + span,
 .eyebrow,
 .micro,
 .status,
+.offline-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 1px solid #2b2d2140;
+  font-size: 12px;
+}
+
+.offline-status {
+  font: 11px monospace;
+  color: var(--olive);
+}
+
+.offline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
 footer {
   font: 11px monospace;
   letter-spacing: 1.3px;
@@ -907,6 +931,30 @@ legend {
    Footer, Hazard Stripe & Dialog
    ========================================================================== */
 
+.offline-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 1px solid #2b2d2140;
+  font-size: 12px;
+}
+
+.offline-status {
+  font: 11px monospace;
+  color: var(--olive);
+}
+
+.offline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
 footer {
   display: flex;
   justify-content: space-between;
@@ -1022,7 +1070,31 @@ dialog p {
     font-size: clamp(50px, 11vw, 76px);
   }
 
-  footer {
+  .offline-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 1px solid #2b2d2140;
+  font-size: 12px;
+}
+
+.offline-status {
+  font: 11px monospace;
+  color: var(--olive);
+}
+
+.offline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+footer {
     font-size: 9px;
   }
 }

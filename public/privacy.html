@@ -64,11 +64,19 @@
             <code>document.cookie</code> values.
           </li>
           <li>
-            <strong>No persistent file storage:</strong> Selected files and
-            compressed outputs are not written to <code>localStorage</code> or
-            <code>IndexedDB</code>. Files are held in browser memory and
-            temporary <code>blob:</code> URLs, which are released when you reset
-            the workspace or leave the page.
+            <strong>No persistent user document storage:</strong> Selected files,
+            filenames, and compressed outputs are never written to
+            <code>localStorage</code>, <code>IndexedDB</code>, or Cache Storage.
+            Files are held in browser memory and temporary <code>blob:</code>
+            URLs, which are released when you reset the workspace or leave the
+            page.
+          </li>
+          <li>
+            <strong>Application asset caching (Offline Mode):</strong> A native
+            Service Worker may store static application assets (HTML, CSS,
+            JavaScript, and PDF.js resources) in browser Cache Storage so the
+            app can load offline. You can clear optional offline assets at any
+            time using <strong>Remove Offline Data</strong>.
           </li>
           <li>
             <strong>Strict Content Security Policy:</strong> Response headers

@@ -50,7 +50,7 @@
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "Any (Web Browser)",
         "browserRequirements": "Requires JavaScript and HTML5 Web Workers",
-        "softwareVersion": "1.0.1",
+        "softwareVersion": "1.1.0",
         "description": "A local-first browser compression utility for PDF documents, raster images, batch queues, and lossless ZIP/GZIP archives.",
         "featureList": [
           "Client-side PDF compression",
@@ -82,6 +82,9 @@
         />
       </a>
       <div class="nav-right">
+        <button class="link" id="install-app" type="button" hidden>
+          Install App
+        </button>
         <button class="link" id="licenses">Licenses</button>
         <button class="link" id="about">About</button>
         <span class="version">V1.0</span>
@@ -425,6 +428,21 @@
               Download <span aria-hidden="true">↓</span>
             </button>
           </div>
+        </div>
+      </section>
+
+      <section class="offline-bar" id="offline-bar" aria-label="Offline mode and updates" hidden>
+        <span class="offline-status" id="offline-status">Offline: Checking…</span>
+        <div class="offline-actions">
+          <button class="link" id="offline-prepare" type="button" hidden>
+            Enable Offline Mode
+          </button>
+          <button class="link" id="offline-remove" type="button" hidden>
+            Remove Offline Data
+          </button>
+          <button class="link" id="update-app" type="button" hidden>
+            Update Available
+          </button>
         </div>
       </section>
 

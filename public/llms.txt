@@ -24,7 +24,7 @@
 
 ## Privacy
 
-All file processing is performed entirely within the user's browser. No files, metadata, or processing results are transmitted to any external server. Gravipress operates fully offline after the initial page load.
+All file processing is performed entirely within the user's browser. No user files, filenames, metadata, or compressed outputs are transmitted to external servers or stored in Cache Storage, `localStorage`, or `IndexedDB`. An optional Service Worker caches only static application assets when **Enable Offline Mode** is activated.
 
 ## Processing Limits
 

@@ -109,6 +109,15 @@ flowchart TD
 
 The application uses binary signature validation, bounded processing limits, archive path sanitization, and cancellation controls to reduce avoidable processing risks. No application database or authentication service is required.
 
+## PWA & Offline Mode
+
+Gravipress is an installable Progressive Web App (PWA) with optional, user-triggered offline compression:
+
+- **Installable app:** Use **Install App** in supported Chromium/Edge browsers, or Safari's **Add to Home Screen** (iOS/iPadOS) / **File → Add to Dock…** (macOS). Desktop Firefox does not support native PWA installation.
+- **Optional offline preparation (~5.2 MB):** Click **Enable Offline Mode** to download and verify all required static application assets (PDF.js workers, CMaps, standard fonts, image, batch, and ZIP/GZIP engines) into browser Cache Storage. Assets are not bulk-downloaded on first visit.
+- **Offline compression:** Once **Offline Ready** is shown, PDF, image, batch, ZIP, and GZIP compression work without an internet connection. User-selected files and compressed outputs are never cached.
+- **Cache management & updates:** Use **Remove Offline Data** to clear optional offline assets while preserving the core shell. When a new build is available, **Update Available** notifies you without interrupting active compression; close all open Gravipress tabs and reopen to activate updates safely. Browsers may evict Cache Storage under low disk space; readiness is revalidated on load.
+
 ## Technology stack
 
 | Layer                | Technology                                                        |

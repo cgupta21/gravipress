@@ -1452,6 +1452,185 @@ window.addEventListener('pagehide', () => {
   clearImagePreview();
 });
 
+const installButton = getElement('install-app');
+let deferredInstallPrompt = null;
+
+function isStandaloneMode() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function isSafariBrowser() {
+  const ua = window.navigator.userAgent;
+  return (
+    /Safari/i.test(ua) &&
+    !/Chrome|Chromium|CriOS|Edg|EdgiOS|FxiOS|Firefox|OPR/i.test(ua)
+  );
+}
+
+if (installButton && !isStandaloneMode()) {
+  if (isSafariBrowser()) {
+    installButton.hidden = false;
+  }
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installButton.hidden = false;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    installButton.hidden = true;
+  });
+
+  installButton.onclick = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      if (outcome === 'accepted') {
+        installButton.hidden = true;
+      }
+      return;
+    }
+
+    if (isSafariBrowser()) {
+      const isIOS = /iPad|iPhone|iPod/i.test(window.navigator.userAgent);
+      openDialog(
+        'Install Gravipress',
+        isIOS
+          ? 'In Safari, tap the Share button and choose "Add to Home Screen" to install Gravipress.'
+          : 'In Safari on macOS, choose File → Add to Dock… (or Share → Add to Dock) to install Gravipress.'
+      );
+    }
+  };
+}
+
+if ('serviceWorker' in navigator) {
+  const offlineBar = getElement('offline-bar');
+  const offlineStatus = getElement('offline-status');
+  const offlinePrepareBtn = getElement('offline-prepare');
+  const offlineRemoveBtn = getElement('offline-remove');
+  const updateAppBtn = getElement('update-app');
+
+  let swRegistration = null;
+  let waitingWorker = null;
+  let reloadingForUpdate = false;
+
+  const formatMB = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+  function applyOfflineStatus(status) {
+    if (!offlineBar || !offlineStatus) return;
+    offlineBar.hidden = false;
+    if (status.ready) {
+      offlineStatus.textContent = `Offline Ready (${status.cachedCount}/${status.totalCount} assets)`;
+      offlinePrepareBtn.hidden = true;
+      offlineRemoveBtn.hidden = false;
+    } else if (status.optionalCachedCount > 0) {
+      offlineStatus.textContent = `Offline: Partial (${status.cachedCount}/${status.totalCount}, ~${formatMB(status.totalBytes)})`;
+      offlinePrepareBtn.textContent = 'Enable Offline Mode';
+      offlinePrepareBtn.hidden = false;
+      offlineRemoveBtn.hidden = false;
+    } else {
+      offlineStatus.textContent = `Offline: Not prepared (~${formatMB(status.totalBytes)})`;
+      offlinePrepareBtn.textContent = 'Enable Offline Mode';
+      offlinePrepareBtn.hidden = false;
+      offlineRemoveBtn.hidden = true;
+    }
+    offlinePrepareBtn.disabled = false;
+  }
+
+  function requestOfflineStatus() {
+    navigator.serviceWorker.controller?.postMessage({ type: 'GET_OFFLINE_STATUS' });
+  }
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type === 'OFFLINE_STATUS') {
+      applyOfflineStatus(data);
+    } else if (data.type === 'OFFLINE_PROGRESS') {
+      const pct = Math.round((data.cachedCount / Math.max(1, data.totalCount)) * 100);
+      offlineStatus.textContent = `Preparing offline… ${pct}% (${data.cachedCount}/${data.totalCount})`;
+      offlinePrepareBtn.disabled = true;
+      offlineRemoveBtn.hidden = true;
+    } else if (data.type === 'OFFLINE_ERROR') {
+      offlineStatus.textContent = `Preparation failed (${data.cachedCount}/${data.totalCount})`;
+      offlinePrepareBtn.textContent = 'Retry Preparation';
+      offlinePrepareBtn.hidden = false;
+      offlinePrepareBtn.disabled = false;
+      offlineRemoveBtn.hidden = data.optionalCachedCount === 0;
+    }
+  });
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForUpdate) {
+      window.location.reload();
+    } else {
+      requestOfflineStatus();
+    }
+  });
+
+  if (offlinePrepareBtn) {
+    offlinePrepareBtn.onclick = () => {
+      if (!navigator.serviceWorker.controller) return;
+      offlinePrepareBtn.disabled = true;
+      navigator.serviceWorker.controller.postMessage({ type: 'PREPARE_OFFLINE' });
+    };
+  }
+
+  if (offlineRemoveBtn) {
+    offlineRemoveBtn.onclick = () => {
+      navigator.serviceWorker.controller?.postMessage({ type: 'REMOVE_OFFLINE_DATA' });
+    };
+  }
+
+  if (updateAppBtn) {
+    updateAppBtn.onclick = () => {
+      if (!waitingWorker) return;
+      if (isOperationActive()) {
+        openDialog(
+          'Compression in progress',
+          'Please wait for the active compression to finish or cancel it before updating.'
+        );
+        return;
+      }
+      openDialog(
+        'Update Ready',
+        'A new version of Gravipress is downloaded and waiting. Close all open Gravipress tabs and reopen the app to activate the update safely.'
+      );
+    };
+  }
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        swRegistration = reg;
+        if (reg.waiting) {
+          waitingWorker = reg.waiting;
+          updateAppBtn.hidden = false;
+        }
+        reg.addEventListener('updatefound', () => {
+          const installing = reg.installing;
+          if (!installing) return;
+          installing.addEventListener('statechange', () => {
+            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+              waitingWorker = installing;
+              updateAppBtn.hidden = false;
+            }
+          });
+        });
+        navigator.serviceWorker.ready.then(() => {
+          requestOfflineStatus();
+        });
+      })
+      .catch(() => {});
+  });
+}
+
 updatePresetDescription();
 updateWarnings();
 syncBatchUi();
