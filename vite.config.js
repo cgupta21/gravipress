@@ -5,7 +5,22 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')
+);
 const pdfjsDistDir = path.join(rootDir, 'node_modules', 'pdfjs-dist');
+
+function appVersionPlugin() {
+  return {
+    name: 'gravipress-app-version',
+    transformIndexHtml(html) {
+      return html.replace(
+        /(<span class="version">)V[^<]*(<\/span>)/,
+        `$1V${pkg.version}$2`
+      );
+    },
+  };
+}
 
 function serveStaticDir(middlewares, mountPath, sourceDir) {
   middlewares.use(mountPath, (req, res, next) => {
@@ -186,7 +201,7 @@ function serviceWorkerManifestPlugin() {
 }
 
 export default defineConfig({
-  plugins: [pdfjsAssetsPlugin(), serviceWorkerManifestPlugin()],
+  plugins: [appVersionPlugin(), pdfjsAssetsPlugin(), serviceWorkerManifestPlugin()],
   build: {
     target: 'esnext',
   },
